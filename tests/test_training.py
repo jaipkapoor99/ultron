@@ -1,8 +1,8 @@
 """CPU-safe training-loop and checkpoint regression tests."""
 
-from contextlib import nullcontext
 import json
 import os
+from contextlib import nullcontext
 from types import SimpleNamespace
 
 import pytest

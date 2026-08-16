@@ -25,6 +25,10 @@ __pycache__/
 .pytest_cache/
 .venv/
 
+# Generated dependency locks
+requirements.lock
+uv.lock
+
 # Notebooks
 *.ipynb
 .ipynb_checkpoints/

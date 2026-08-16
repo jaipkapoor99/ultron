@@ -11,9 +11,9 @@ import json
 import os
 import sys
 import warnings
+from collections.abc import Callable
 from dataclasses import fields
 from pathlib import Path
-from typing import Callable
 
 import torch
 import torch.nn.functional as F
@@ -317,18 +317,20 @@ def main() -> None:
 
     generator = torch.Generator(device=accelerator.device)
     generator.manual_seed(args.seed)
-    selector = lambda logits, tokens: select_next_token(
-        logits,
-        tokens,
-        greedy=args.greedy,
-        temperature=args.temperature,
-        top_k=args.top_k,
-        top_p=args.top_p,
-        min_p=args.min_p,
-        repetition_penalty=args.repetition_penalty,
-        no_repeat_ngram_size=args.no_repeat_ngram_size,
-        generator=generator,
-    )
+    def selector(logits, tokens):
+        return select_next_token(
+            logits,
+            tokens,
+            greedy=args.greedy,
+            temperature=args.temperature,
+            top_k=args.top_k,
+            top_p=args.top_p,
+            min_p=args.min_p,
+            repetition_penalty=args.repetition_penalty,
+            no_repeat_ngram_size=args.no_repeat_ngram_size,
+            generator=generator,
+        )
+
     eos_token_id = None if args.ignore_eos else tokenizer.eos_token_id
 
     accelerator.print(

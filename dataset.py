@@ -5,13 +5,14 @@ window while converting uint16 token IDs to the int64 dtype PyTorch
 embeddings require.
 """
 
-import os
 import glob
+import os
 from bisect import bisect_right
 
-import torch
 import numpy as np
+import torch
 from torch.utils.data import DataLoader, Dataset, Sampler, SequentialSampler, Subset
+
 from config import UltronConfig
 
 

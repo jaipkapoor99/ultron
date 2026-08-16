@@ -23,7 +23,6 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import UltronConfig
 from telemetry import TokenizationTelemetry
 
-
 STATE_SCHEMA_VERSION = 1
 
 

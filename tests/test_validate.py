@@ -3,9 +3,9 @@
 import sys
 from types import SimpleNamespace
 
+import pytest
 import torch
 import torch.nn.functional as F
-import pytest
 
 from config import UltronConfig
 from model import UltronModel
@@ -74,7 +74,7 @@ def test_full_validation_defines_wandb_metrics(monkeypatch):
 
     ValidationTelemetry._define_wandb_metrics(accelerator)
 
-    by_name = {name: options for name, options in definitions}
+    by_name = dict(definitions)
     assert by_name["validation/*"] == {}
     assert by_name["validation/loss"]["summary"] == "min"
     assert by_name["validation/tokens_per_sec"]["summary"] == "max"

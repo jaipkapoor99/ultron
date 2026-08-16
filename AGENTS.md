@@ -12,14 +12,21 @@ Large runtime artifacts are intentionally untracked: `shards_edu/`, `accelerate_
 uv venv --python 3.14.6 .venv
 source .venv/bin/activate
 uv pip install torch==2.13.0
-uv pip install -r requirements.lock
+uv pip install -r pyproject.toml --group dev
+uv run --no-sync ruff check .
 pytest -q
 ULTRON_TEST_COMPILE=1 pytest -q tests/test_model.py -k torch_compile
 accelerate launch train.py --mode=test
 accelerate launch scripts/generate.py --prompt "Hello" --samples 4
 ```
 
-`requirements.lock` pins backend-neutral dependencies; install the appropriate PyTorch 2.13 wheel first. The standard test suite is CPU-safe. The compiler test is opt-in because it is slower and toolchain-dependent. `train.py --mode=test` exercises the training pipeline and requires prepared dataset shards; full training should run on a CUDA device with BF16 support.
+`pyproject.toml` is the canonical dependency source. Generated dependency files
+such as `uv.lock` and `requirements.lock` are intentionally untracked. Install
+the appropriate PyTorch 2.13 wheel before the project dependencies. The standard
+test suite is CPU-safe. The compiler test is opt-in because it is slower and
+toolchain-dependent. `train.py --mode=test` exercises the training pipeline and
+requires prepared dataset shards; full training should run on a CUDA device with
+BF16 support.
 
 ## Training & Data Invariants
 

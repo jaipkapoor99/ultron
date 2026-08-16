@@ -7,12 +7,12 @@ Usage:
 
 import argparse
 import os
+
 import torch
 
-
 from config import UltronConfig
-from model import UltronModel
 from dataset import get_dataloaders
+from model import UltronModel
 
 
 def build_config(args):
@@ -60,9 +60,7 @@ def main():
     trainer = UltronTrainer(model, optimizer_muon, optimizer_adamw, train_loader, dev_loader, config, accelerator)
 
     # Load checkpoint depending on --mode=fresh|continue|test
-    if args.mode == "test":
-        pass
-    elif args.mode == "fresh":
+    if args.mode == "test" or args.mode == "fresh":
         pass
     elif args.mode == "continue":
         # print_rich removed

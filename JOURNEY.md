@@ -136,11 +136,33 @@ only a validation artifact.
 
 ## Building a Reproducible Project
 
-The repository gained a locked environment, Python 3.14 support, a documented
-development workflow, CI, broader regression tests, full validation tooling,
-and contributor guidance. Dataset, telemetry, optimizer, checkpoint, and
-training-loop behavior are covered by CPU-safe tests, with CUDA validation kept
-as a separate hardware check.
+The repository gained Python 3.14 support, a documented development workflow,
+CI, broader regression tests, full validation tooling, and contributor
+guidance. `pyproject.toml` is now the sole dependency manifest. Runtime and
+development dependencies, including pytest and Ruff, are declared together
+instead of being duplicated across hand-maintained requirements files.
+
+Generated lock and requirements files are deliberately untracked. For CPU CI,
+`uv` resolves a temporary requirements file from `pyproject.toml` while omitting
+the project-selected PyTorch package, then installs the official CPU PyTorch
+wheel separately. This keeps local CUDA selection flexible without allowing CI
+and contributor setup to drift from the canonical dependency declarations.
+
+Ruff was introduced as an executable quality gate rather than a passive editor
+preference. Its rules cover likely bugs, invalid imports and statements,
+Pyflakes errors, deterministic import ordering, unnecessary collection
+construction, safe simplifications, Python 3.14 modernization, and Ruff-native
+correctness checks. The initial migration used automatic safe fixes first and
+reserved manual edits for the remaining cases where intent mattered.
+
+CI now rebuilds dependencies from project metadata, verifies the installed
+environment, runs Ruff, byte-compiles the source tree, and executes the
+CPU-safe test suite. CUDA compilation and training remain separate hardware
+checks.
+
+Dataset, telemetry, optimizer, checkpoint, and training-loop behavior are
+covered by CPU-safe tests, with CUDA validation kept as a separate hardware
+check.
 
 The suite now exercises successful behavior and deliberate corruption:
 invalid window geometry, shard-boundary errors,
@@ -194,6 +216,9 @@ upload conditions.
 6. Prefer reproducible behavior over behavior that merely appears deterministic.
 7. Treat failed runs as evidence that improves the next design.
 8. Test corruption and resume boundaries, not only successful execution.
+9. Keep dependency declarations singular; generate environment-specific inputs
+   at the boundary that needs them.
+10. Run safe automated lint fixes before making narrow semantic corrections.
 
 Ultron's engineering journey is not a story of avoiding mistakes. It is a story
 of converting each mistake into a stronger invariant, a clearer test, and a

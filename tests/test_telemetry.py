@@ -1,7 +1,7 @@
 """Telemetry calculation and metric-schema tests."""
 
-from datetime import datetime, timezone
 import math
+from datetime import UTC, datetime
 from types import SimpleNamespace
 
 import pytest
@@ -54,7 +54,7 @@ class FakeMainAccelerator(FakeAccelerator):
 
 def test_fresh_wandb_run_name_starts_with_timestamp(monkeypatch):
     monkeypatch.setenv("ULTRON_RUN_NAME", "pretraining")
-    now = datetime(2026, 8, 6, 19, 33, 56, tzinfo=timezone.utc)
+    now = datetime(2026, 8, 6, 19, 33, 56, tzinfo=UTC)
 
     assert wandb_run_name("fresh", now) == "20260806-193356-pretraining"
     assert wandb_run_name("continue", now) == "pretraining"
@@ -179,7 +179,7 @@ def test_metric_definitions_use_native_wandb_step(monkeypatch):
 
     UltronTelemetry._define_wandb_metrics(FakeMainAccelerator())
 
-    by_name = {name: options for name, options in definitions}
+    by_name = dict(definitions)
     assert "step" not in by_name
     assert by_name["train/*"] == {}
     assert by_name["eval/*"] == {}

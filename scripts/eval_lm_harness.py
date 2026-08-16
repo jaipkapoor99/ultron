@@ -11,8 +11,8 @@ import argparse
 import json
 import os
 import sys
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 import torch
 
@@ -20,7 +20,6 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from config import UltronConfig
 from model import UltronModel, load_ultron_state_dict
-
 
 DEFAULT_TASKS = (
     "arc_easy",

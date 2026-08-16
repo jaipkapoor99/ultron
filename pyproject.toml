@@ -1,0 +1,40 @@
+[project]
+name = "ultron"
+version = "0.1.0"
+requires-python = ">=3.14.6"
+dependencies = [
+    "accelerate>=1.14.0",
+    "datasets>=5.0.0",
+    "huggingface-hub>=0.25.0",
+    "lm-eval>=0.4.0",
+    "numpy>=2.5.0",
+    "rich>=15.0.0",
+    "safetensors>=0.8.0",
+    "torch>=2.13.0",
+    "transformers>=5.14.0",
+    "wandb>=0.28.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.0",
+    "ruff>=0.16.3",
+]
+
+[tool.ruff]
+target-version = "py314"
+line-length = 88
+
+[tool.ruff.lint]
+select = [
+    "B",    # flake8-bugbear: likely bugs and design problems
+    "C4",   # flake8-comprehensions: clearer collection construction
+    "E4",   # pycodestyle import errors
+    "E7",   # pycodestyle statement errors
+    "E9",   # pycodestyle runtime errors
+    "F",    # Pyflakes correctness checks
+    "I",    # isort import ordering
+    "RUF",  # Ruff-specific correctness checks
+    "SIM",  # flake8-simplify
+    "UP",   # pyupgrade for the supported Python version
+]

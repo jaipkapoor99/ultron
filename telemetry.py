@@ -9,14 +9,14 @@ import os
 import time
 import warnings
 from collections import deque
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Mapping
+from typing import Any
 
 from accelerate import Accelerator
 from tqdm import tqdm
-
 
 Clock = Callable[[], float]
 

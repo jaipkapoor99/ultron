@@ -4,6 +4,8 @@ Contains dataclass parameters for the Ultron (113M) architecture.
 """
 
 from dataclasses import dataclass, field, fields
+
+
 @dataclass
 class UltronConfig:
     B: int = 16                 # Micro-batch size per pass (65k tokens/step with grad accum 4)

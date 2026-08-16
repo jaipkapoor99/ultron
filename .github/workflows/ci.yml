@@ -28,9 +28,7 @@ jobs:
         uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
           enable-cache: true
-          cache-dependency-glob: |
-            requirements.txt
-            requirements.lock
+          cache-dependency-glob: pyproject.toml
 
       - name: Install Python
         run: uv python install 3.14.6
@@ -43,10 +41,20 @@ jobs:
           uv pip install --python .venv/bin/python \
             torch==2.13.0 \
             --index-url https://download.pytorch.org/whl/cpu
-          uv pip install --python .venv/bin/python -r requirements.lock
+          uv pip compile pyproject.toml \
+            --output-file /tmp/ultron-requirements.txt \
+            --python .venv/bin/python \
+            --torch-backend cpu \
+            --no-emit-package torch \
+            --group dev
+          uv pip install --python .venv/bin/python \
+            --requirements /tmp/ultron-requirements.txt
 
       - name: Validate dependencies
         run: uv pip check --python .venv/bin/python
+
+      - name: Run Ruff
+        run: .venv/bin/ruff check .
 
       - name: Compile Python sources
         run: |

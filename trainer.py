@@ -1,12 +1,23 @@
-import os
 import json
+import os
+
 import torch
 from accelerate import Accelerator
+
 from telemetry import UltronTelemetry
 
 
 class UltronTrainer:
-    def __init__(self, model, optimizer_muon, optimizer_adamw, train_loader, dev_loader, config, accelerator: Accelerator):
+    def __init__(
+        self,
+        model,
+        optimizer_muon,
+        optimizer_adamw,
+        train_loader,
+        dev_loader,
+        config,
+        accelerator: Accelerator,
+    ):
         self.model = model
         self.optimizer_muon = optimizer_muon
         self.optimizer_adamw = optimizer_adamw
@@ -14,12 +25,14 @@ class UltronTrainer:
         self.dev_loader = dev_loader
         self.config = config
         self.accelerator = accelerator
-        
+
         self.accelerate_dir = "accelerate_checkpoint"
         self.step = 0
         self.dev_batch_cursor = 0
         self.decay_start_step = int(0.8 * config.max_steps)
-        self.telemetry = UltronTelemetry(config, accelerator, checkpoint_dir=self.accelerate_dir)
+        self.telemetry = UltronTelemetry(
+            config, accelerator, checkpoint_dir=self.accelerate_dir
+        )
         self.tokens_per_step = self.telemetry.global_tokens_per_step
         self.total_training_tokens = self.tokens_per_step * config.max_steps
         if len(self.train_loader) % accelerator.gradient_accumulation_steps:
@@ -48,25 +61,31 @@ class UltronTrainer:
         elif self.step < self.decay_start_step:
             lr = self.config.learning_rate
         else:
-            decay_ratio = (self.step - self.decay_start_step) / max(1, self.config.max_steps - self.decay_start_step)
-            lr = self.config.min_lr + (1.0 - decay_ratio) * (self.config.learning_rate - self.config.min_lr)
-            
+            decay_ratio = (self.step - self.decay_start_step) / max(
+                1, self.config.max_steps - self.decay_start_step
+            )
+            lr = self.config.min_lr + (1.0 - decay_ratio) * (
+                self.config.learning_rate - self.config.min_lr
+            )
+
         for param_group in self.optimizer_adamw.param_groups:
-            param_group['lr'] = lr
-            
+            param_group["lr"] = lr
+
         if self.optimizer_muon is not None:
             for param_group in self.optimizer_muon.param_groups:
-                param_group['lr'] = 0.04 * (lr / self.config.learning_rate)
+                param_group["lr"] = 0.04 * (lr / self.config.learning_rate)
         return lr
 
     def load_checkpoint(self):
         if os.path.isdir(self.accelerate_dir):
-            self.accelerator.print(f"Resuming training state from '{self.accelerate_dir}'...")
+            self.accelerator.print(
+                f"Resuming training state from '{self.accelerate_dir}'..."
+            )
             self.accelerator.load_state(self.accelerate_dir)
-            
+
             state_file = os.path.join(self.accelerate_dir, "training_state.json")
             if os.path.exists(state_file):
-                with open(state_file, "r") as f:
+                with open(state_file) as f:
                     state_info = json.load(f)
                     checkpoint_seed = state_info.get("data_seed")
                     if (
@@ -78,14 +97,15 @@ class UltronTrainer:
                             "configuration"
                         )
                     self.step = state_info.get("step", 0)
-                    self.dev_batch_cursor = (
-                        state_info.get("dev_batch_cursor", 0)
-                        % max(1, len(self.dev_loader))
+                    self.dev_batch_cursor = state_info.get("dev_batch_cursor", 0) % max(
+                        1, len(self.dev_loader)
                     )
                     self.accelerator.print(f"✓ Restored training step: {self.step:,}")
-            self.accelerator.print(f"✓ State restored successfully!")
+            self.accelerator.print("✓ State restored successfully!")
         else:
-            self.accelerator.print(f"⚠ No checkpoint found at '{self.accelerate_dir}', starting from scratch.")
+            self.accelerator.print(
+                f"⚠ No checkpoint found at '{self.accelerate_dir}', starting from scratch."
+            )
 
     def _sample_dev_batches(self):
         """Yield the next deterministic window of validation batches."""
@@ -109,27 +129,32 @@ class UltronTrainer:
             for batch in segment_loader:
                 yield batch
                 consumed += 1
-                self.dev_batch_cursor = (
-                    self.dev_batch_cursor + 1
-                ) % total_batches
+                self.dev_batch_cursor = (self.dev_batch_cursor + 1) % total_batches
                 if consumed >= segment_size:
                     break
             if consumed != segment_size:
                 raise RuntimeError(
-                    "Validation dataloader ended before the sampled window "
-                    "was complete"
+                    "Validation dataloader ended before the sampled window was complete"
                 )
             remaining -= consumed
 
     def evaluate(self, train_loss, lr):
         self.model.eval()
-        total_dev_loss = torch.zeros((), device=self.accelerator.device, dtype=torch.float64)
-        total_dev_tokens = torch.zeros((), device=self.accelerator.device, dtype=torch.float64)
+        total_dev_loss = torch.zeros(
+            (), device=self.accelerator.device, dtype=torch.float64
+        )
+        total_dev_tokens = torch.zeros(
+            (), device=self.accelerator.device, dtype=torch.float64
+        )
         dev_batches = 0
         with torch.no_grad():
             for xb_dev, yb_dev in self._sample_dev_batches():
                 dev_out = self.model(xb_dev, yb_dev)
-                dev_loss = dev_out.loss if (hasattr(dev_out, "loss") and dev_out.loss is not None) else dev_out[1]
+                dev_loss = (
+                    dev_out.loss
+                    if (hasattr(dev_out, "loss") and dev_out.loss is not None)
+                    else dev_out[1]
+                )
                 token_count = yb_dev.numel()
                 total_dev_loss += dev_loss.detach().double() * token_count
                 total_dev_tokens += token_count
@@ -186,14 +211,18 @@ class UltronTrainer:
 
     def train(self):
         self.model.train()
-        
-        self.print_rich(f"[bold yellow]⚡ Pre-training for {self.config.max_steps:,} steps ({self.total_training_tokens:,} total tokens)...[/bold yellow]\n")
+
+        self.print_rich(
+            f"[bold yellow]⚡ Pre-training for {self.config.max_steps:,} steps ({self.total_training_tokens:,} total tokens)...[/bold yellow]\n"
+        )
         # Training loop without tqdm progress bar
-        
+
         data_epoch, skip_count = self._data_position(self.step)
 
         if self.step > 0:
-            self.print_rich(f"[bold yellow]⏩ Fast-forwarding dataset past {skip_count:,} batches...[/bold yellow]")
+            self.print_rich(
+                f"[bold yellow]⏩ Fast-forwarding dataset past {skip_count:,} batches...[/bold yellow]"
+            )
             active_dataloader = self.accelerator.skip_first_batches(
                 self.train_loader,
                 skip_count,
@@ -202,14 +231,14 @@ class UltronTrainer:
             active_dataloader = self.train_loader
         if hasattr(active_dataloader, "set_epoch"):
             active_dataloader.set_epoch(data_epoch)
-            
+
         while self.step < self.config.max_steps:
             for xb, yb in active_dataloader:
                 if self.step >= self.config.max_steps:
                     break
-                    
+
                 lr = self.update_learning_rate()
-                    
+
                 with self.accelerator.accumulate(self.model):
                     with self.accelerator.autocast():
                         out = self.model(xb, yb)
@@ -217,26 +246,29 @@ class UltronTrainer:
                             loss = out.loss
                         else:
                             loss = out[1]
-                            
+
                     self.accelerator.backward(loss)
                     if self.accelerator.sync_gradients:
                         self.accelerator.clip_grad_norm_(self.model.parameters(), 1.0)
-                        
+
                     self.optimizer_adamw.step()
                     if self.optimizer_muon is not None:
                         self.optimizer_muon.step()
-                        
+
                     self.optimizer_adamw.zero_grad()
                     if self.optimizer_muon is not None:
                         self.optimizer_muon.zero_grad()
-                    
+
                     if self.accelerator.sync_gradients:
                         self.step += 1
                         self.telemetry.update_terminal_progress(
                             self.step,
                             loss=loss.item(),
                         )
-                        is_eval_step = (self.step % self.config.eval_interval == 0 or self.step == self.config.max_steps)
+                        is_eval_step = (
+                            self.step % self.config.eval_interval == 0
+                            or self.step == self.config.max_steps
+                        )
                         if not is_eval_step:
                             # Non-eval steps: log train metrics only
                             self.telemetry.log_training_step(
@@ -250,7 +282,7 @@ class UltronTrainer:
             if hasattr(self.train_loader, "set_epoch"):
                 self.train_loader.set_epoch(data_epoch)
             active_dataloader = self.train_loader
-        
+
         self.telemetry.close()
         self.print_rich("\n[bold green]🎉 Pre-training Complete![/bold green]")
         self.save_checkpoint(final=True)
@@ -259,7 +291,5 @@ class UltronTrainer:
         """Return deterministic shuffle epoch and batch offset for a step."""
         if step < 0:
             raise ValueError("step cannot be negative")
-        consumed_batches = (
-            step * self.accelerator.gradient_accumulation_steps
-        )
+        consumed_batches = step * self.accelerator.gradient_accumulation_steps
         return divmod(consumed_batches, len(self.train_loader))

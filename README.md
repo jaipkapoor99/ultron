@@ -155,8 +155,7 @@ ultron/
 ├── train.py                # Main Accelerated Distributed Training Runner
 ├── trainer.py              # Training loop with PyTorch Muon + fused AdamW
 ├── telemetry.py            # Rolling throughput, ETA, W&B metrics, and progress UI
-├── requirements.txt        # Virtual environment dependencies
-├── requirements.lock       # Reproducible backend-neutral dependency pins
+├── pyproject.toml          # Canonical dependencies and Ruff configuration
 ├── assets/                 # Tracked documentation figures, including average train loss
 ├── accelerate_checkpoint/  # Saved Accelerate model weights, optimizer state & RNG seeds
 ├── shards_edu/             # Binary FineWeb-Edu tokenized data shards (.bin)
@@ -218,12 +217,20 @@ source .venv/bin/activate
 
 # Install the PyTorch 2.13 wheel for your CUDA/CPU platform first
 uv pip install torch==2.13.0
-uv pip install -r requirements.lock
+uv pip install -r pyproject.toml --group dev
 uv pip check
+
+# Lint the project
+uv run --no-sync ruff check .
 
 # Optional: install if torch.compile cannot locate a CUDA compiler
 uv pip install nvidia-cuda-nvcc
 ```
+
+`pyproject.toml` is the single source of truth for runtime and development
+dependencies. Lock and exported requirements files are generated artifacts and
+are intentionally ignored; CI resolves a temporary CPU-safe requirements file
+directly from the project metadata.
 
 ### 2. Tokenize Dataset
 
@@ -328,7 +335,7 @@ Run the CPU-safe test suite locally:
 pytest -q
 ```
 
-The current suite contains 125 passing CPU-safe tests. It covers model
+The current suite collects 133 CPU-safe tests. It covers model
 causality and caching, optimizer partitioning, non-overlapping dataset windows,
 deterministic shuffle epochs, exact checkpoint positioning, rotating validation,
 telemetry summaries, tokenization corruption, shard validation, evaluation
@@ -396,10 +403,11 @@ repository permissions and a 20-minute timeout.
 | Stage | CI behavior |
 | :--- | :--- |
 | Environment | Ubuntu runner with uv-managed Python 3.14.6 |
-| Dependency cache | Keyed from `requirements.txt` and `requirements.lock` |
+| Dependency cache | Keyed from `pyproject.toml` |
 | PyTorch | CPU-only PyTorch 2.13 from the official PyTorch wheel index |
-| Locked dependencies | Installs the backend-neutral `requirements.lock` |
+| Dependencies | Generates a CPU-safe requirements file from `pyproject.toml` |
 | Dependency validation | Runs `uv pip check` to reject incompatible packages |
+| Static analysis | Runs Ruff bug, import, modernization, and simplification checks |
 | Syntax validation | Byte-compiles core modules, scripts, and tests |
 | Unit tests | Runs pytest without writing bytecode or `.pytest_cache` |
 
@@ -407,6 +415,7 @@ Reproduce the CI checks locally from an activated environment:
 
 ```bash
 uv pip check
+uv run --no-sync ruff check .
 python -m compileall -q \
   config.py dataset.py model.py telemetry.py train.py trainer.py scripts tests
 PYTHONDONTWRITEBYTECODE=1 python -m pytest -q -p no:cacheprovider

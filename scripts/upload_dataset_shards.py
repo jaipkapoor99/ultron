@@ -3,12 +3,12 @@
 import argparse
 import json
 import os
+import sys
 from pathlib import Path
 
-from rich.console import Console
 from huggingface_hub import HfApi
+from rich.console import Console
 
-import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import UltronConfig
 

@@ -12,11 +12,12 @@ Implements:
 """
 
 import math
+from collections.abc import Callable
+from dataclasses import dataclass
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from dataclasses import dataclass
-from typing import Callable, Optional, Tuple, List
 
 try:
     from .config import UltronConfig
@@ -28,11 +29,11 @@ except ImportError:
 class UltronOutput:
     """Output class for UltronModel containing logits, optional loss, and optional KV cache."""
     logits: torch.Tensor
-    loss: Optional[torch.Tensor] = None
-    past_key_values: Optional[Tuple] = None
+    loss: torch.Tensor | None = None
+    past_key_values: tuple | None = None
 
 
-def load_ultron_state_dict(model: "UltronModel", state_dict: dict):
+def load_ultron_state_dict(model: UltronModel, state_dict: dict):
     """Load an Ultron checkpoint and reject incompatible key sets.
 
     Safetensors stores only one copy of tied parameters, so exactly one of the
@@ -83,7 +84,7 @@ class RotaryEmbedding(nn.Module):
         self.register_buffer("cos_cached", emb.cos()[None, None, :, :], persistent=False)
         self.register_buffer("sin_cached", emb.sin()[None, None, :, :], persistent=False)
 
-    def forward(self, x: torch.Tensor, seq_len: int, offset: int = 0) -> Tuple[torch.Tensor, torch.Tensor]:
+    def forward(self, x: torch.Tensor, seq_len: int, offset: int = 0) -> tuple[torch.Tensor, torch.Tensor]:
         if seq_len + offset > self.cos_cached.size(2):
             self._build_cache(seq_len + offset)
         return self.cos_cached[:, :, offset:seq_len+offset, :], self.sin_cached[:, :, offset:seq_len+offset, :]
@@ -112,7 +113,7 @@ class CausalSelfAttention(nn.Module):
         self.q_norm = RMSNorm(self.head_dim)
         self.k_norm = RMSNorm(self.head_dim)
 
-    def forward(self, x: torch.Tensor, rot_emb: Optional[Tuple[torch.Tensor, torch.Tensor]] = None, past_key_value: Optional[Tuple[torch.Tensor, torch.Tensor]] = None) -> Tuple[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
+    def forward(self, x: torch.Tensor, rot_emb: tuple[torch.Tensor, torch.Tensor] | None = None, past_key_value: tuple[torch.Tensor, torch.Tensor] | None = None) -> tuple[torch.Tensor, tuple[torch.Tensor, torch.Tensor]]:
         B, T, C = x.size()
         qkv = self.c_attn(x)
         
@@ -191,7 +192,7 @@ class Block(nn.Module):
         self.ln_2 = RMSNorm(config.C)
         self.mlp  = SwiGLUMLP(config)
 
-    def forward(self, x: torch.Tensor, rot_emb: Optional[Tuple[torch.Tensor, torch.Tensor]] = None, past_key_value: Optional[Tuple[torch.Tensor, torch.Tensor]] = None) -> Tuple[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
+    def forward(self, x: torch.Tensor, rot_emb: tuple[torch.Tensor, torch.Tensor] | None = None, past_key_value: tuple[torch.Tensor, torch.Tensor] | None = None) -> tuple[torch.Tensor, tuple[torch.Tensor, torch.Tensor]]:
         attn_out, present_key_value = self.attn(self.ln_1(x), rot_emb=rot_emb, past_key_value=past_key_value)
         x = x + attn_out
         x = x + self.mlp(self.ln_2(x))
@@ -206,12 +207,14 @@ class UltronModel(nn.Module):
         # Padded vocab size for Tensor Core efficiency
         self.vocab_size = math.ceil(config.vocab_size / 64) * 64
         
-        self.transformer = nn.ModuleDict(dict(
-            wte = nn.Embedding(self.vocab_size, config.C),
-            drop = nn.Dropout(config.dropout),
-            h = nn.ModuleList([Block(config) for _ in range(config.n_layer)]),
-            ln_f = RMSNorm(config.C),
-        ))
+        self.transformer = nn.ModuleDict(
+            {
+                "wte": nn.Embedding(self.vocab_size, config.C),
+                "drop": nn.Dropout(config.dropout),
+                "h": nn.ModuleList([Block(config) for _ in range(config.n_layer)]),
+                "ln_f": RMSNorm(config.C),
+            }
+        )
         self.lm_head = nn.Linear(config.C, self.vocab_size, bias=False)
 
         self.rotary_emb = RotaryEmbedding(config.head_dim, max_seq_len=config.T, base=config.rope_base)
@@ -239,8 +242,8 @@ class UltronModel(nn.Module):
         elif isinstance(module, nn.Embedding):
             torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
 
-    def forward(self, idx: torch.Tensor, targets: torch.Tensor = None, use_cache: bool = False, past_key_values: Optional[List[Tuple[torch.Tensor, torch.Tensor]]] = None):
-        B, T = idx.size()
+    def forward(self, idx: torch.Tensor, targets: torch.Tensor = None, use_cache: bool = False, past_key_values: list[tuple[torch.Tensor, torch.Tensor]] | None = None):
+        _batch_size, T = idx.size()
         
         past_length = past_key_values[0][0].size(2) if past_key_values is not None else 0
         assert T + past_length <= self.config.T, f"Cannot forward sequence length {T + past_length}, model block size is {self.config.T}"
@@ -325,8 +328,8 @@ class UltronModel(nn.Module):
         self,
         idx: torch.Tensor,
         max_new_tokens: int,
-        token_selector: Optional[Callable[[torch.Tensor, torch.Tensor], torch.Tensor]] = None,
-        eos_token_id: Optional[int] = None,
+        token_selector: Callable[[torch.Tensor, torch.Tensor], torch.Tensor] | None = None,
+        eos_token_id: int | None = None,
     ) -> torch.Tensor:
         """Generate tokens with KV caching while delegating decoding policy.
 
@@ -351,21 +354,18 @@ class UltronModel(nn.Module):
             return idx
 
         if token_selector is None:
-            token_selector = lambda logits, _tokens: torch.argmax(
-                logits,
-                dim=-1,
-                keepdim=True,
-            )
+            def token_selector(logits, _tokens):
+                return torch.argmax(
+                            logits,
+                            dim=-1,
+                            keepdim=True,
+                        )
 
         past_key_values = None
         finished = torch.zeros(idx.size(0), dtype=torch.bool, device=idx.device)
         for _ in range(max_new_tokens):
-            if past_key_values is None:
-                # Pre-fill phase: process the entire prompt
-                idx_cond = idx
-            else:
-                # Decoding phase: process only the last generated token
-                idx_cond = idx[:, -1:]
+            # Pre-fill with the prompt, then decode one token at a time.
+            idx_cond = idx if past_key_values is None else idx[:, -1:]
                 
             out = self(idx_cond, use_cache=True, past_key_values=past_key_values)
             logits = out.logits[:, -1, :self.config.vocab_size] # Strip padded vocab

@@ -8,12 +8,13 @@ Usage:
     python3 scripts/upload_checkpoint.py [--repo-id=USER/REPO] [--private]
 """
 
-import os
 import argparse
-from rich.console import Console
-from huggingface_hub import HfApi, login
-
+import os
 import sys
+
+from huggingface_hub import HfApi, login
+from rich.console import Console
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from config import UltronConfig
