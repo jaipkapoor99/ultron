@@ -329,10 +329,10 @@ first reads a shard.
 
 ## ✅ Tests & Continuous Integration
 
-Run the CPU-safe test suite locally:
+Run the CPU-safe test suite with branch coverage:
 
 ```bash
-pytest -q
+uv run --no-sync python -m pytest -q --cov --cov-report=term-missing
 ```
 
 The current suite collects 133 CPU-safe tests. It covers model
@@ -340,7 +340,8 @@ causality and caching, optimizer partitioning, non-overlapping dataset windows,
 deterministic shuffle epochs, exact checkpoint positioning, rotating validation,
 telemetry summaries, tokenization corruption, shard validation, evaluation
 harness behavior, and upload guards. The optional compiler test is skipped
-unless explicitly enabled.
+unless explicitly enabled. The current full-suite baseline is 69.89% branch
+coverage, with a 69% minimum enforced by CI.
 
 Run the slower compiler smoke test explicitly:
 
@@ -409,7 +410,7 @@ repository permissions and a 20-minute timeout.
 | Dependency validation | Runs `uv pip check` to reject incompatible packages |
 | Static analysis | Runs Ruff bug, import, modernization, and simplification checks |
 | Syntax validation | Byte-compiles core modules, scripts, and tests |
-| Unit tests | Runs pytest without writing bytecode or `.pytest_cache` |
+| Unit tests | Runs pytest with branch coverage and enforces a 69% minimum |
 
 Reproduce the CI checks locally from an activated environment:
 
@@ -418,7 +419,8 @@ uv pip check
 uv run --no-sync ruff check .
 python -m compileall -q \
   config.py dataset.py model.py telemetry.py train.py trainer.py scripts tests
-PYTHONDONTWRITEBYTECODE=1 python -m pytest -q -p no:cacheprovider
+PYTHONDONTWRITEBYTECODE=1 python -m pytest -q -p no:cacheprovider \
+  --cov --cov-report=term-missing --cov-fail-under=69
 ```
 
 CI deliberately remains CPU-safe: it does not download dataset shards, run

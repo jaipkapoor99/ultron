@@ -160,6 +160,13 @@ environment, runs Ruff, byte-compiles the source tree, and executes the
 CPU-safe test suite. CUDA compilation and training remain separate hardware
 checks.
 
+Test counts alone did not show which production paths were actually exercised,
+so the suite gained `pytest-cov` with branch measurement. The first complete
+run established a 69.89% baseline across 1,618 statements and 468 branches. CI
+enforces a 69% floor and prints missing lines, turning coverage into a
+regression signal without pretending that percentage alone measures test
+quality.
+
 Dataset, telemetry, optimizer, checkpoint, and training-loop behavior are
 covered by CPU-safe tests, with CUDA validation kept as a separate hardware
 check.

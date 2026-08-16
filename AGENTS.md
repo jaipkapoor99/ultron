@@ -14,8 +14,8 @@ source .venv/bin/activate
 uv pip install torch==2.13.0
 uv pip install -r pyproject.toml --group dev
 uv run --no-sync ruff check .
-pytest -q
-ULTRON_TEST_COMPILE=1 pytest -q tests/test_model.py -k torch_compile
+uv run --no-sync python -m pytest -q --cov --cov-report=term-missing
+ULTRON_TEST_COMPILE=1 python -m pytest -q tests/test_model.py -k torch_compile
 accelerate launch train.py --mode=test
 accelerate launch scripts/generate.py --prompt "Hello" --samples 4
 ```
@@ -44,7 +44,14 @@ No formatter is currently enforced. Keep imports minimal, add type hints to publ
 
 ## Testing Guidelines
 
-Tests use `pytest` and follow `test_<behavior>` naming. The CPU-safe suite currently has 125 tests covering model contracts, data geometry, shuffled resume, rotating validation, telemetry, atomic tokenization, shard integrity, evaluation harness behavior, multiprocessing-safe memmaps, and upload guards. Every bug fix needs a regression test; test corruption and boundary conditions as well as successful execution. Avoid downloads and full-model allocation unless explicitly marked slow.
+Tests use `pytest` and follow `test_<behavior>` naming. The CPU-safe suite
+currently collects 133 tests and enforces a 69% branch-coverage floor in CI.
+It covers model contracts, data geometry, shuffled resume, rotating validation,
+telemetry, atomic tokenization, shard integrity, evaluation harness behavior,
+multiprocessing-safe memmaps, and upload guards. Every bug fix needs a
+regression test; test corruption and boundary conditions as well as successful
+execution. Avoid downloads and full-model allocation unless explicitly marked
+slow.
 
 ## Commit & Pull Request Guidelines
 

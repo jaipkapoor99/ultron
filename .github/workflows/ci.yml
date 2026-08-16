@@ -65,4 +65,8 @@ jobs:
       - name: Run tests
         env:
           PYTHONDONTWRITEBYTECODE: "1"
-        run: .venv/bin/python -m pytest -q -p no:cacheprovider
+        run: |
+          .venv/bin/python -m pytest -q -p no:cacheprovider \
+            --cov \
+            --cov-report=term-missing \
+            --cov-fail-under=69
