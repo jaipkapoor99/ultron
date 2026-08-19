@@ -12,6 +12,7 @@ import os
 import signal
 import sys
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 from datasets import load_dataset
@@ -197,7 +198,7 @@ def _is_tokenization_complete(
     )
 
 
-def _close_iterator(iterator) -> None:
+def _close_iterator(iterator: Any) -> None:
     """Best-effort cancellation of an exhausted streaming iterator."""
     close = getattr(iterator, "close", None)
     if callable(close):
@@ -222,8 +223,8 @@ def main(shard_size_tokens: int = 100_000_000, max_shards: int = 100) -> None:
         tokenizer_info = api.model_info(config.tokenizer_name)
         if dataset_info.sha is None or tokenizer_info.sha is None:
             raise RuntimeError("Failed to resolve dataset or tokenizer revision sha.")
-        dataset_revision = str(dataset_info.sha)
-        tokenizer_revision = str(tokenizer_info.sha)
+        dataset_revision = dataset_info.sha
+        tokenizer_revision = tokenizer_info.sha
         state = _new_state(
             config,
             dataset_revision,
@@ -294,7 +295,7 @@ def main(shard_size_tokens: int = 100_000_000, max_shards: int = 100) -> None:
     )
     stop_requested = False
 
-    def handle_interrupt(_signum, _frame):
+    def handle_interrupt(_signum: int, _frame: Any) -> None:
         nonlocal stop_requested
         stop_requested = True
 

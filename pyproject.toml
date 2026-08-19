@@ -17,10 +17,13 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "mdformat>=0.7.22",
+    "mdformat-gfm>=0.4.1",
     "pyrefly>=0.1.0",
     "pytest>=9.0.0",
     "pytest-cov>=7.1.0",
     "ruff>=0.16.3",
+    "types-tqdm>=4.67.0",
 ]
 
 [tool.coverage.run]
@@ -48,17 +51,25 @@ indent-style = "space"
 
 [tool.ruff.lint]
 select = [
+    "ANN2", # flake8-annotations: missing return type annotations
     "B",    # flake8-bugbear: likely bugs and design problems
     "C4",   # flake8-comprehensions: clearer collection construction
     "E4",   # pycodestyle import errors
     "E7",   # pycodestyle statement errors
     "E9",   # pycodestyle runtime errors
     "F",    # Pyflakes correctness checks
+    "FLY",  # flynt: string formatting conversions
+    "FURB", # refurb: modernization & redundant conversions
     "I",    # isort import ordering
+    "PERF", # perflint: performance anti-patterns
+    "PIE",  # flake8-pie: unnecessary code & redundant conversions
     "RUF",  # Ruff-specific correctness checks
     "SIM",  # flake8-simplify
     "UP",   # pyupgrade for the supported Python version
 ]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["ANN2"]
 
 [tool.pyrefly]
 python_version = "3.14"

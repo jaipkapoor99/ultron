@@ -1,6 +1,7 @@
 """Dataset uploader validation tests."""
 
 import json
+from typing import Any
 
 import numpy as np
 import pytest
@@ -8,7 +9,9 @@ import pytest
 from scripts.upload_dataset_shards import validate_complete_shard_set
 
 
-def write_complete_set(directory, shard_count=2, shard_size=8):
+def write_complete_set(
+    directory: Any, shard_count: int = 2, shard_size: int = 8
+) -> dict[str, Any]:
     state = {
         "max_shards": shard_count,
         "next_shard": shard_count,
@@ -35,13 +38,13 @@ def write_complete_set(directory, shard_count=2, shard_size=8):
     return state
 
 
-def test_complete_shard_set_is_accepted(tmp_path):
+def test_complete_shard_set_is_accepted(tmp_path: Any) -> None:
     expected = write_complete_set(tmp_path)
 
     assert validate_complete_shard_set(tmp_path) == expected
 
 
-def test_incomplete_shard_set_is_rejected(tmp_path):
+def test_incomplete_shard_set_is_rejected(tmp_path: Any) -> None:
     state = write_complete_set(tmp_path)
     state["next_shard"] = 1
     (tmp_path / "tokenization_state.json").write_text(json.dumps(state))
@@ -50,7 +53,7 @@ def test_incomplete_shard_set_is_rejected(tmp_path):
         validate_complete_shard_set(tmp_path)
 
 
-def test_inconsistent_metadata_is_rejected(tmp_path):
+def test_inconsistent_metadata_is_rejected(tmp_path: Any) -> None:
     write_complete_set(tmp_path)
     metadata_path = tmp_path / "fineweb_edu_shard_0001_meta.json"
     metadata = json.loads(metadata_path.read_text())
@@ -61,13 +64,13 @@ def test_inconsistent_metadata_is_rejected(tmp_path):
         validate_complete_shard_set(tmp_path)
 
 
-def test_missing_state_is_rejected(tmp_path):
+def test_missing_state_is_rejected(tmp_path: Any) -> None:
     with pytest.raises(RuntimeError, match="Missing exact tokenization state"):
         validate_complete_shard_set(tmp_path)
 
 
 @pytest.mark.parametrize("missing_kind", ["shard", "metadata"])
-def test_missing_committed_files_are_rejected(tmp_path, missing_kind):
+def test_missing_committed_files_are_rejected(tmp_path: Any, missing_kind: str) -> None:
     write_complete_set(tmp_path)
     if missing_kind == "shard":
         (tmp_path / "fineweb_edu_shard_0001.bin").unlink()
@@ -80,7 +83,7 @@ def test_missing_committed_files_are_rejected(tmp_path, missing_kind):
         validate_complete_shard_set(tmp_path)
 
 
-def test_wrong_shard_size_is_rejected(tmp_path):
+def test_wrong_shard_size_is_rejected(tmp_path: Any) -> None:
     write_complete_set(tmp_path)
     (tmp_path / "fineweb_edu_shard_0001.bin").write_bytes(b"short")
 
@@ -98,10 +101,10 @@ def test_wrong_shard_size_is_rejected(tmp_path):
     ],
 )
 def test_every_metadata_contract_field_is_validated(
-    tmp_path,
-    field,
-    value,
-):
+    tmp_path: Any,
+    field: str,
+    value: Any,
+) -> None:
     write_complete_set(tmp_path)
     path = tmp_path / "fineweb_edu_shard_0001_meta.json"
     metadata = json.loads(path.read_text())

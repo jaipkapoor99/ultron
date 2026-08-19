@@ -4,6 +4,7 @@ Contains dataclass parameters for the Ultron (113M) architecture.
 """
 
 from dataclasses import dataclass, field, fields
+from typing import Any
 
 
 @dataclass
@@ -44,7 +45,7 @@ class UltronConfig:
     is_test_mode: bool = False  # Transient test mode flag for quick sanity passes
     head_dim: int = field(init=False)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         assert self.C % self.n_head == 0, (
             f"Embedding dimension C ({self.C}) must be divisible by n_head ({self.n_head})"
         )
@@ -54,7 +55,7 @@ class UltronConfig:
         self.head_dim = self.C // self.n_head
 
     @classmethod
-    def from_metadata(cls, **overrides):
+    def from_metadata(cls, **overrides: Any) -> UltronConfig:
         """Create an UltronConfig instance with optional overrides."""
         return cls(**overrides)
 

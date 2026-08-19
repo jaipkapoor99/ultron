@@ -2,6 +2,7 @@
 
 import sys
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 import torch
@@ -13,7 +14,7 @@ from scripts.validate import load_checkpoint_weights, sequence_cross_entropy
 from telemetry import ValidationTelemetry
 
 
-def tiny_config():
+def tiny_config() -> UltronConfig:
     return UltronConfig(
         B=1,
         T=16,
@@ -25,7 +26,7 @@ def tiny_config():
     )
 
 
-def test_sequence_cross_entropy_matches_per_sequence_reference():
+def test_sequence_cross_entropy_matches_per_sequence_reference() -> None:
     torch.manual_seed(3)
     logits = torch.randn(2, 4, 7)
     targets = torch.randint(0, 7, (2, 4))
@@ -41,7 +42,9 @@ def test_sequence_cross_entropy_matches_per_sequence_reference():
     torch.testing.assert_close(losses, expected)
 
 
-def test_checkpoint_weight_loader_rejects_empty_directory(tmp_path):
+def test_checkpoint_weight_loader_rejects_empty_directory(
+    tmp_path: Any,
+) -> None:
     with pytest.raises(FileNotFoundError, match="No model weights found"):
         load_checkpoint_weights(
             UltronModel(tiny_config()),
@@ -49,7 +52,9 @@ def test_checkpoint_weight_loader_rejects_empty_directory(tmp_path):
         )
 
 
-def test_checkpoint_weight_loader_accepts_pytorch_state_dict(tmp_path):
+def test_checkpoint_weight_loader_accepts_pytorch_state_dict(
+    tmp_path: Any,
+) -> None:
     source = UltronModel(tiny_config())
     weight_path = tmp_path / "pytorch_model.bin"
     torch.save(source.state_dict(), weight_path)
@@ -64,7 +69,7 @@ def test_checkpoint_weight_loader_accepts_pytorch_state_dict(tmp_path):
     )
 
 
-def test_full_validation_defines_wandb_metrics(monkeypatch):
+def test_full_validation_defines_wandb_metrics(monkeypatch: Any) -> None:
     definitions = []
     fake_wandb = SimpleNamespace(
         define_metric=lambda name, **options: definitions.append((name, options))

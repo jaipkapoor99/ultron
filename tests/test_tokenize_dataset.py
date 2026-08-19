@@ -1,6 +1,7 @@
 """Exact-resume and atomic-shard helper tests."""
 
 import json
+from typing import Any
 
 import numpy as np
 import pytest
@@ -16,7 +17,7 @@ from scripts.tokenize_dataset import (
 )
 
 
-def make_state(shard_size=8, max_shards=2):
+def make_state(shard_size: int = 8, max_shards: int = 2) -> dict[str, Any]:
     return _new_state(
         config=UltronConfig(),
         dataset_revision="dataset-sha",
@@ -26,7 +27,9 @@ def make_state(shard_size=8, max_shards=2):
     )
 
 
-def test_resume_state_round_trip_preserves_exact_pending_tokens(tmp_path):
+def test_resume_state_round_trip_preserves_exact_pending_tokens(
+    tmp_path: Any,
+) -> None:
     state = make_state()
     pending = [3, 5, 8, 13]
     _save_resume_state(tmp_path, state, pending, previous_pending_file=None)
@@ -43,7 +46,7 @@ def test_resume_state_round_trip_preserves_exact_pending_tokens(tmp_path):
     assert restored_pending.tolist() == pending
 
 
-def test_committed_shard_size_is_validated(tmp_path):
+def test_committed_shard_size_is_validated(tmp_path: Any) -> None:
     state = make_state()
     values = np.arange(8, dtype=np.uint16)
     _atomic_shard_write(tmp_path / "fineweb_edu_shard_0000.bin", values)
@@ -76,7 +79,7 @@ def test_committed_shard_size_is_validated(tmp_path):
         _load_resume_state(tmp_path, 8, 2, UltronConfig())
 
 
-def test_outputs_without_resume_state_are_rejected(tmp_path):
+def test_outputs_without_resume_state_are_rejected(tmp_path: Any) -> None:
     metadata = tmp_path / "fineweb_edu_shard_0000_meta.json"
     metadata.write_text(json.dumps({"shard_index": 0}))
 
@@ -84,7 +87,7 @@ def test_outputs_without_resume_state_are_rejected(tmp_path):
         _load_resume_state(tmp_path, 8, 2, UltronConfig())
 
 
-def test_complete_state_is_detected_without_reopening_dataset():
+def test_complete_state_is_detected_without_reopening_dataset() -> None:
     state = make_state()
     state.update({"next_shard": 2, "committed_tokens": 16})
 
@@ -92,7 +95,7 @@ def test_complete_state_is_detected_without_reopening_dataset():
     assert not _is_tokenization_complete(state, 8, 3)
 
 
-def test_resume_rejects_configuration_drift(tmp_path):
+def test_resume_rejects_configuration_drift(tmp_path: Any) -> None:
     state = make_state()
     _save_resume_state(tmp_path, state, [], previous_pending_file=None)
     changed_config = UltronConfig(dataset_config="different-config")
@@ -101,7 +104,7 @@ def test_resume_rejects_configuration_drift(tmp_path):
         _load_resume_state(tmp_path, 8, 2, changed_config)
 
 
-def test_resume_rejects_missing_or_corrupt_pending_buffer(tmp_path):
+def test_resume_rejects_missing_or_corrupt_pending_buffer(tmp_path: Any) -> None:
     state = make_state()
     _save_resume_state(tmp_path, state, [1, 2], previous_pending_file=None)
     pending_path = tmp_path / ".pending_tokens_0000.npy"
@@ -115,7 +118,7 @@ def test_resume_rejects_missing_or_corrupt_pending_buffer(tmp_path):
         _load_resume_state(tmp_path, 8, 2, UltronConfig())
 
 
-def test_resume_rejects_inconsistent_committed_metadata(tmp_path):
+def test_resume_rejects_inconsistent_committed_metadata(tmp_path: Any) -> None:
     state = make_state()
     _atomic_shard_write(
         tmp_path / "fineweb_edu_shard_0000.bin",
@@ -132,7 +135,7 @@ def test_resume_rejects_inconsistent_committed_metadata(tmp_path):
         _load_resume_state(tmp_path, 8, 2, UltronConfig())
 
 
-def test_new_pending_checkpoint_removes_superseded_buffer(tmp_path):
+def test_new_pending_checkpoint_removes_superseded_buffer(tmp_path: Any) -> None:
     state = make_state()
     _save_resume_state(tmp_path, state, [1], previous_pending_file=None)
     old_pending = tmp_path / ".pending_tokens_0000.npy"

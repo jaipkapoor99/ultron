@@ -1,6 +1,7 @@
 """CPU-safe tests for the EleutherAI evaluation entry point."""
 
 import json
+from typing import Any
 
 import pytest
 import torch
@@ -30,21 +31,21 @@ def tiny_config() -> UltronConfig:
     )
 
 
-def test_default_cli_tasks_match_declared_suite():
+def test_default_cli_tasks_match_declared_suite() -> None:
     args = build_parser().parse_args([])
 
     assert parse_tasks(args.tasks) == list(DEFAULT_TASKS)
     assert args.limit == 50
 
 
-def test_task_parser_trims_and_deduplicates():
+def test_task_parser_trims_and_deduplicates() -> None:
     assert parse_tasks(" arc_easy,hellaswag,arc_easy, ") == [
         "arc_easy",
         "hellaswag",
     ]
 
 
-def test_task_parser_rejects_empty_input():
+def test_task_parser_rejects_empty_input() -> None:
     with pytest.raises(ValueError, match="at least one"):
         parse_tasks(" , ")
 
@@ -53,11 +54,11 @@ def test_task_parser_rejects_empty_input():
     ("value", "expected"),
     [(0, None), (1, 1), (50, 50)],
 )
-def test_limit_normalization(value, expected):
+def test_limit_normalization(value: int, expected: int | None) -> None:
     assert normalize_limit(value) == expected
 
 
-def test_limit_normalization_rejects_negative_values():
+def test_limit_normalization_rejects_negative_values() -> None:
     with pytest.raises(ValueError, match="cannot be negative"):
         normalize_limit(-1)
 
@@ -72,16 +73,16 @@ def test_limit_normalization_rejects_negative_values():
         ({"exact_match": 1.0}, None),
     ],
 )
-def test_accuracy_selection(metrics, expected):
+def test_accuracy_selection(metrics: dict[str, Any], expected: float | None) -> None:
     assert select_accuracy(metrics) == expected
 
 
-def test_loader_rejects_empty_checkpoint_directory(tmp_path):
+def test_loader_rejects_empty_checkpoint_directory(tmp_path: Any) -> None:
     with pytest.raises(FileNotFoundError, match="No checkpoint weights found"):
         load_base_model(tmp_path, tiny_config())
 
 
-def test_loader_accepts_pytorch_checkpoint_on_cpu(tmp_path):
+def test_loader_accepts_pytorch_checkpoint_on_cpu(tmp_path: Any) -> None:
     source = UltronModel(tiny_config())
     torch.save(source.state_dict(), tmp_path / "pytorch_model.bin")
     messages = []
@@ -101,7 +102,7 @@ def test_loader_accepts_pytorch_checkpoint_on_cpu(tmp_path):
     )
 
 
-def test_loader_rejects_incompatible_checkpoint(tmp_path):
+def test_loader_rejects_incompatible_checkpoint(tmp_path: Any) -> None:
     source = UltronModel(tiny_config())
     state_dict = source.state_dict()
     state_dict.pop("transformer.h.0.attn.c_attn.weight")
@@ -111,7 +112,7 @@ def test_loader_rejects_incompatible_checkpoint(tmp_path):
         load_base_model(tmp_path, tiny_config())
 
 
-def test_results_are_saved_atomically_and_stringified(tmp_path):
+def test_results_are_saved_atomically_and_stringified(tmp_path: Any) -> None:
     output_path = tmp_path / "nested" / "results.json"
 
     save_results(

@@ -3,6 +3,7 @@
 import math
 from datetime import UTC, datetime
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 
@@ -17,13 +18,13 @@ from telemetry import (
 
 
 class FakeClock:
-    def __init__(self):
+    def __init__(self) -> None:
         self.now = 0.0
 
-    def __call__(self):
+    def __call__(self) -> float:
         return self.now
 
-    def advance(self, seconds):
+    def advance(self, seconds: float) -> None:
         self.now += seconds
 
 
@@ -32,27 +33,29 @@ class FakeAccelerator:
     num_processes = 4
     is_main_process = False
 
-    def __init__(self):
-        self.logged = []
+    def __init__(self) -> None:
+        self.logged: list[tuple[int, dict[str, Any]]] = []
 
-    def log(self, metrics, step):
+    def log(self, metrics: dict[str, Any], step: int) -> None:
         self.logged.append((step, metrics))
 
 
 class FakeMainAccelerator(FakeAccelerator):
     is_main_process = True
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self.run = SimpleNamespace(id="run-123", summary={})
 
-    def get_tracker(self, name, unwrap=False):
+    def get_tracker(self, name: str, unwrap: bool = False) -> Any:
         assert name == "wandb"
         assert unwrap is True
         return self.run
 
 
-def test_fresh_wandb_run_name_starts_with_timestamp(monkeypatch):
+def test_fresh_wandb_run_name_starts_with_timestamp(
+    monkeypatch: Any,
+) -> None:
     monkeypatch.setenv("ULTRON_RUN_NAME", "pretraining")
     now = datetime(2026, 8, 6, 19, 33, 56, tzinfo=UTC)
 
@@ -60,7 +63,7 @@ def test_fresh_wandb_run_name_starts_with_timestamp(monkeypatch):
     assert wandb_run_name("continue", now) == "pretraining"
 
 
-def test_rolling_rate_uses_recent_cumulative_samples():
+def test_rolling_rate_uses_recent_cumulative_samples() -> None:
     clock = FakeClock()
     meter = RollingRateMeter(window_seconds=10, clock=clock)
 
@@ -71,7 +74,7 @@ def test_rolling_rate_uses_recent_cumulative_samples():
     assert meter.update(240).units_per_second == pytest.approx(5)
 
 
-def test_rolling_rate_rejects_invalid_window_and_resets_on_counter_rewind():
+def test_rolling_rate_rejects_invalid_window_and_resets_on_counter_rewind() -> None:
     with pytest.raises(ValueError, match="greater than zero"):
         RollingRateMeter(window_seconds=0)
 
@@ -84,7 +87,7 @@ def test_rolling_rate_rejects_invalid_window_and_resets_on_counter_rewind():
     assert meter.update(5).units_per_second == 0
 
 
-def test_training_throughput_counts_all_workers():
+def test_training_throughput_counts_all_workers() -> None:
     clock = FakeClock()
     accelerator = FakeAccelerator()
     config = SimpleNamespace(B=2, T=10, max_steps=20)
@@ -100,7 +103,7 @@ def test_training_throughput_counts_all_workers():
     assert eta == 14
 
 
-def test_structured_training_metrics_have_no_legacy_duplicates():
+def test_structured_training_metrics_have_no_legacy_duplicates() -> None:
     accelerator = FakeAccelerator()
     config = SimpleNamespace(B=2, T=10, max_steps=20)
     telemetry = UltronTelemetry(config, accelerator)
@@ -120,7 +123,7 @@ def test_structured_training_metrics_have_no_legacy_duplicates():
     assert "perf/global_tokens_per_step" not in metrics
 
 
-def test_training_metrics_keep_throughput_and_dev_loss_continuous():
+def test_training_metrics_keep_throughput_and_dev_loss_continuous() -> None:
     accelerator = FakeAccelerator()
     config = SimpleNamespace(B=2, T=10, max_steps=20)
     telemetry = UltronTelemetry(config, accelerator)
@@ -141,7 +144,9 @@ def test_training_metrics_keep_throughput_and_dev_loss_continuous():
     assert second["eval/dev_loss"] == 2.75
 
 
-def test_evaluation_logs_interval_average_and_combined_chart(monkeypatch):
+def test_evaluation_logs_interval_average_and_combined_chart(
+    monkeypatch: Any,
+) -> None:
     accelerator = FakeAccelerator()
     config = SimpleNamespace(B=2, T=10, max_steps=20)
     telemetry = UltronTelemetry(config, accelerator)
@@ -170,7 +175,7 @@ def test_evaluation_logs_interval_average_and_combined_chart(monkeypatch):
     assert telemetry._loss_history_steps == [3, 5]
 
 
-def test_metric_definitions_use_native_wandb_step(monkeypatch):
+def test_metric_definitions_use_native_wandb_step(monkeypatch: Any) -> None:
     definitions = []
     fake_wandb = SimpleNamespace(
         define_metric=lambda name, **options: definitions.append((name, options))
@@ -188,14 +193,16 @@ def test_metric_definitions_use_native_wandb_step(monkeypatch):
     assert "goal" not in by_name["eval/dev_loss"]
 
 
-def test_wandb_run_id_uses_unwrapped_tracker():
+def test_wandb_run_id_uses_unwrapped_tracker() -> None:
     config = SimpleNamespace(B=2, T=10, max_steps=20)
     telemetry = UltronTelemetry(config, FakeMainAccelerator())
 
     assert telemetry.get_wandb_run_id() == "run-123"
 
 
-def test_wandb_summary_contains_run_totals_and_live_results(monkeypatch):
+def test_wandb_summary_contains_run_totals_and_live_results(
+    monkeypatch: Any,
+) -> None:
     accelerator = FakeMainAccelerator()
     config = SimpleNamespace(B=2, T=10, max_steps=20)
     UltronTelemetry._initialize_wandb_summary(config, accelerator)
@@ -222,7 +229,7 @@ def test_wandb_summary_contains_run_totals_and_live_results(monkeypatch):
     assert accelerator.run.summary["validation/evaluations"] == 2
 
 
-def test_tokenization_eta_and_validation():
+def test_tokenization_eta_and_validation() -> None:
     clock = FakeClock()
     telemetry = TokenizationTelemetry(
         target_tokens=1_000,
@@ -246,7 +253,7 @@ def test_tokenization_eta_and_validation():
     ("target", "start"),
     [(0, 0), (-1, 0), (10, -1), (10, 11)],
 )
-def test_tokenization_telemetry_rejects_invalid_bounds(target, start):
+def test_tokenization_telemetry_rejects_invalid_bounds(target: int, start: int) -> None:
     with pytest.raises(ValueError):
         TokenizationTelemetry(
             target_tokens=target,
@@ -255,7 +262,7 @@ def test_tokenization_telemetry_rejects_invalid_bounds(target, start):
         )
 
 
-def test_validation_telemetry_reports_local_timing_and_throughput():
+def test_validation_telemetry_reports_local_timing_and_throughput() -> None:
     clock = FakeClock()
     accelerator = FakeAccelerator()
     telemetry = ValidationTelemetry(
@@ -278,7 +285,7 @@ def test_validation_telemetry_reports_local_timing_and_throughput():
         telemetry.update(processed_sequences=3, mean_loss=2.0)
 
 
-def test_validation_telemetry_logs_throttled_wandb_metrics():
+def test_validation_telemetry_logs_throttled_wandb_metrics() -> None:
     clock = FakeClock()
     accelerator = FakeMainAccelerator()
     telemetry = ValidationTelemetry(
@@ -299,7 +306,7 @@ def test_validation_telemetry_logs_throttled_wandb_metrics():
     assert accelerator.run.summary["validation/tokens_processed"] == 80
 
 
-def test_validation_telemetry_finalizes_wandb_summary():
+def test_validation_telemetry_finalizes_wandb_summary() -> None:
     clock = FakeClock()
     accelerator = FakeMainAccelerator()
     telemetry = ValidationTelemetry(
@@ -335,5 +342,6 @@ def test_validation_telemetry_finalizes_wandb_summary():
         (3_000_000_000, "3.00G tok/s"),
     ],
 )
-def test_format_rate(rate, expected):
+def test_format_rate(rate: float, expected: str) -> None:
+    assert format_rate(rate, "tok") == expected
     assert format_rate(rate, "tok") == expected

@@ -7,6 +7,7 @@ Usage:
 
 import argparse
 import os
+from typing import Any
 
 import torch
 
@@ -15,7 +16,7 @@ from dataset import get_dataloaders
 from model import UltronModel
 
 
-def build_config(args):
+def build_config(args: Any) -> UltronConfig:
     """Build a run configuration from parsed CLI arguments."""
     config = UltronConfig.from_metadata()
     config.is_test_mode = args.mode == "test"
@@ -28,7 +29,7 @@ def build_config(args):
     return config
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(description="Ultron (113M) Pre-training")
     parser.add_argument(
         "--mode",

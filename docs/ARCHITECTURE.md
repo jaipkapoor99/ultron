@@ -111,11 +111,5 @@ This Gemma-2-style regularization restricts extreme probability divergence and p
 
 ### 3.5 Hybrid Muon + AdamW Optimizer
 
-\times \tanh\left(\frac{\text{Logits}}{15.0}\right)
-\]
-This Gemma-2-style regularization restricts extreme probability divergence and prevents overconfidence during pre-training.
-
-### 3.5 Hybrid Muon + AdamW Optimizer
-
 - **`torch.optim.Muon`**: Handles 2D matrix weights (attention and MLP projections) using Newton-Schulz matrix iterations for orthogonalized parameter updates ($LR = 0.04$).
 - **Fused `AdamW`**: Handles 1D vectors, RMSNorm gains, and token embeddings ($LR = 1.2 \times 10^{-3}$).

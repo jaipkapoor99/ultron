@@ -10,14 +10,14 @@ from telemetry import UltronTelemetry
 class UltronTrainer:
     def __init__(
         self,
-        model,
-        optimizer_muon,
-        optimizer_adamw,
-        train_loader,
-        dev_loader,
-        config,
+        model: Any,
+        optimizer_muon: Any,
+        optimizer_adamw: Any,
+        train_loader: Any,
+        dev_loader: Any,
+        config: Any,
         accelerator: Any,
-    ):
+    ) -> None:
         self.model = model
         self.optimizer_muon = optimizer_muon
         self.optimizer_adamw = optimizer_adamw
@@ -41,20 +41,22 @@ class UltronTrainer:
                 "gradient_accumulation_steps for exact resume"
             )
 
-    def print_rich(self, msg: str):
+    def print_rich(self, msg: str) -> None:
         if hasattr(self, "telemetry") and self.telemetry is not None:
             self.telemetry.print_message(msg)
         else:
             self.accelerator.print(msg)
 
-    def print_table_row(self, step: int, train_loss: float, dev_loss: float, lr: float):
+    def print_table_row(
+        self, step: int, train_loss: float, dev_loss: float, lr: float
+    ) -> None:
         """Print one compact evaluation summary through the telemetry UI."""
         self.print_rich(
             f"Step {step:,} | train loss {train_loss:.4f} | "
             f"sampled dev loss {dev_loss:.4f} | lr {lr:.3e}"
         )
 
-    def update_learning_rate(self):
+    def update_learning_rate(self) -> float:
         # WSD (Warmup-Stable-Linear-Decay) Learning Rate Schedule
         if self.step < self.config.warmup_steps:
             lr = self.config.learning_rate * (self.step + 1) / self.config.warmup_steps
@@ -76,7 +78,7 @@ class UltronTrainer:
                 param_group["lr"] = 0.04 * (lr / self.config.learning_rate)
         return lr
 
-    def load_checkpoint(self):
+    def load_checkpoint(self) -> None:
         if os.path.isdir(self.accelerate_dir):
             self.accelerator.print(
                 f"Resuming training state from '{self.accelerate_dir}'..."
@@ -107,7 +109,7 @@ class UltronTrainer:
                 f"⚠ No checkpoint found at '{self.accelerate_dir}', starting from scratch."
             )
 
-    def _sample_dev_batches(self):
+    def _sample_dev_batches(self) -> Any:
         """Yield the next deterministic window of validation batches."""
         total_batches = len(self.dev_loader)
         if total_batches == 0:
@@ -138,7 +140,7 @@ class UltronTrainer:
                 )
             remaining -= consumed
 
-    def evaluate(self, train_loss, lr):
+    def evaluate(self, train_loss: float, lr: float) -> None:
         self.model.eval()
         total_dev_loss = torch.zeros(
             (), device=self.accelerator.device, dtype=torch.float64
@@ -179,7 +181,7 @@ class UltronTrainer:
         self.save_checkpoint()
         self.model.train()
 
-    def save_checkpoint(self, final=False):
+    def save_checkpoint(self, final: bool = False) -> None:
         if getattr(self.config, "is_test_mode", False):
             return
         # Save only the Accelerate training state (model weights, optimizer, etc.)
@@ -209,7 +211,7 @@ class UltronTrainer:
         if final:
             self.print_rich("✓ Saved Accelerate checkpoint.")
 
-    def train(self):
+    def train(self) -> None:
         self.model.train()
 
         self.print_rich(

@@ -14,10 +14,12 @@ Implements:
 import math
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Any
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torch.utils.checkpoint
 
 try:
     from .config import UltronConfig
@@ -34,7 +36,9 @@ class UltronOutput:
     past_key_values: tuple | list | None = None
 
 
-def load_ultron_state_dict(model: UltronModel, state_dict: dict):
+def load_ultron_state_dict(
+    model: UltronModel, state_dict: dict
+) -> tuple[list[Any], list[Any]]:
     """Load an Ultron checkpoint and reject incompatible key sets.
 
     Safetensors stores only one copy of tied parameters, so exactly one of the
@@ -81,7 +85,9 @@ class RotaryEmbedding(nn.Module):
     cos_cached: torch.Tensor
     sin_cached: torch.Tensor
 
-    def __init__(self, dim: int, max_seq_len: int = 4096, base: float = 10000.0):
+    def __init__(
+        self, dim: int, max_seq_len: int = 4096, base: float = 10000.0
+    ) -> None:
         super().__init__()
         self.dim = dim
         self.max_seq_len = max_seq_len
@@ -89,7 +95,7 @@ class RotaryEmbedding(nn.Module):
         self.register_buffer("inv_freq", inv_freq, persistent=False)
         self._build_cache(max_seq_len)
 
-    def _build_cache(self, seq_len: int):
+    def _build_cache(self, seq_len: int) -> None:
         t = torch.arange(
             seq_len, dtype=self.inv_freq.dtype, device=self.inv_freq.device
         )
@@ -115,7 +121,7 @@ class RotaryEmbedding(nn.Module):
 class CausalSelfAttention(nn.Module):
     """Grouped-Query Attention with RoPE using PyTorch SDPA."""
 
-    def __init__(self, config: UltronConfig):
+    def __init__(self, config: UltronConfig) -> None:
         super().__init__()
         assert config.C % config.n_head == 0
         assert config.n_head % config.n_kv_head == 0
@@ -132,7 +138,7 @@ class CausalSelfAttention(nn.Module):
 
         self.c_attn = nn.Linear(config.C, q_dim + 2 * kv_dim, bias=False)
         self.c_proj = nn.Linear(config.C, config.C, bias=False)
-        self.c_proj.RESIDUAL_SCALE_INIT = 1  # pyrefly: ignore[bad-argument-type]
+        vars(self.c_proj)["RESIDUAL_SCALE_INIT"] = 1
 
         self.q_norm = RMSNorm(self.head_dim)
         self.k_norm = RMSNorm(self.head_dim)
@@ -204,7 +210,7 @@ class CausalSelfAttention(nn.Module):
 class SwiGLUMLP(nn.Module):
     """Modern SwiGLU FeedForward Network (used in LLaMA 3, Qwen 2.5, & Mistral)"""
 
-    def __init__(self, config: UltronConfig):
+    def __init__(self, config: UltronConfig) -> None:
         super().__init__()
         hidden_dim = int(2 * (4 * config.C) / 3)
         hidden_dim = 64 * (
@@ -214,7 +220,7 @@ class SwiGLUMLP(nn.Module):
         self.w1 = nn.Linear(config.C, hidden_dim, bias=False)
         self.w2 = nn.Linear(hidden_dim, config.C, bias=False)
         self.w3 = nn.Linear(config.C, hidden_dim, bias=False)
-        self.w2.RESIDUAL_SCALE_INIT = 1  # pyrefly: ignore[bad-argument-type]
+        vars(self.w2)["RESIDUAL_SCALE_INIT"] = 1
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.w2(F.silu(self.w1(x)) * self.w3(x))
@@ -223,7 +229,7 @@ class SwiGLUMLP(nn.Module):
 class RMSNorm(nn.Module):
     """Root Mean Square Layer Normalization (RMSNorm) - LLaMA / Qwen 2.5 standard"""
 
-    def __init__(self, dim: int, eps: float = 1e-5):
+    def __init__(self, dim: int, eps: float = 1e-5) -> None:
         super().__init__()
         self.eps = eps
         self.weight = nn.Parameter(torch.ones(dim))
@@ -236,7 +242,7 @@ class RMSNorm(nn.Module):
 class Block(nn.Module):
     """Transformer block with SDPA attention and a SwiGLU MLP."""
 
-    def __init__(self, config: UltronConfig):
+    def __init__(self, config: UltronConfig) -> None:
         super().__init__()
         self.ln_1 = RMSNorm(config.C)
         self.attn = CausalSelfAttention(config)
@@ -260,7 +266,7 @@ class Block(nn.Module):
 class TransformerBody(nn.Module):
     """Transformer body containing token embeddings, blocks, and final norm."""
 
-    def __init__(self, config: UltronConfig, vocab_size: int):
+    def __init__(self, config: UltronConfig, vocab_size: int) -> None:
         super().__init__()
         self.wte = nn.Embedding(vocab_size, config.C)
         self.drop = nn.Dropout(config.dropout)
@@ -271,7 +277,7 @@ class TransformerBody(nn.Module):
 class UltronModel(nn.Module):
     """Full Ultron (113M) language model with RMSNorm, RoPE, and GQA."""
 
-    def __init__(self, config: UltronConfig):
+    def __init__(self, config: UltronConfig) -> None:
         super().__init__()
         self.config = config
 
@@ -291,13 +297,13 @@ class UltronModel(nn.Module):
         self.apply(self._init_weights)
 
     @property
-    def device(self):
+    def device(self) -> torch.device:
         return next(self.parameters()).device
 
-    def tie_weights(self):
+    def tie_weights(self) -> None:
         self.transformer.wte.weight = self.lm_head.weight
 
-    def _init_weights(self, module: nn.Module):
+    def _init_weights(self, module: nn.Module) -> None:
         if isinstance(module, nn.Linear):
             std = 0.02
             if hasattr(module, "RESIDUAL_SCALE_INIT"):
@@ -314,7 +320,7 @@ class UltronModel(nn.Module):
         targets: torch.Tensor | None = None,
         use_cache: bool = False,
         past_key_values: list[tuple[torch.Tensor, torch.Tensor]] | None = None,
-    ):
+    ) -> UltronOutput:
         _batch_size, T = idx.size()
 
         past_length = (
@@ -365,7 +371,9 @@ class UltronModel(nn.Module):
             )
         return UltronOutput(logits=logits, loss=loss)
 
-    def configure_optimizers(self, learning_rate: float):
+    def configure_optimizers(
+        self, learning_rate: float
+    ) -> tuple[torch.optim.Optimizer, torch.optim.Optimizer]:
         """Hybrid Muon + AdamW optimizer setup.
 
         Muon handles 2D weight matrices (attention, MLP projections).
@@ -392,9 +400,9 @@ class UltronModel(nn.Module):
         )
         return optimizer_muon, optimizer_adamw
 
-    def partition_optimizer_parameters(self):
+    def partition_optimizer_parameters(self) -> dict[str, list[torch.nn.Parameter]]:
         """Assign every trainable parameter to exactly one optimizer group."""
-        partitions = {
+        partitions: dict[str, list[torch.nn.Parameter]] = {
             "muon": [],
             "adamw_decay": [],
             "adamw_nodecay": [],
@@ -445,7 +453,9 @@ class UltronModel(nn.Module):
 
         if token_selector is None:
 
-            def token_selector(logits, _tokens):
+            def token_selector(
+                logits: torch.Tensor, _tokens: torch.Tensor
+            ) -> torch.Tensor:
                 return torch.argmax(
                     logits,
                     dim=-1,

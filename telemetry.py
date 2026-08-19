@@ -41,7 +41,9 @@ class RateSnapshot:
 class RollingRateMeter:
     """Estimate recent throughput from monotonic cumulative counters."""
 
-    def __init__(self, window_seconds: float = 30.0, clock: Clock = time.monotonic):
+    def __init__(
+        self, window_seconds: float = 30.0, clock: Clock = time.monotonic
+    ) -> None:
         if window_seconds <= 0:
             raise ValueError("window_seconds must be greater than zero")
         self.window_seconds = window_seconds
@@ -52,7 +54,7 @@ class RollingRateMeter:
         now = self.clock()
         if self.samples and total_units < self.samples[-1][1]:
             self.samples.clear()
-        self.samples.append((now, float(total_units)))
+        self.samples.append((now, total_units))
 
         while len(self.samples) > 2 and now - self.samples[0][0] > self.window_seconds:
             self.samples.popleft()
@@ -94,12 +96,12 @@ class UltronTelemetry:
 
     def __init__(
         self,
-        config,
+        config: Any,
         accelerator: Any,
         checkpoint_dir: str = "accelerate_checkpoint",
         *,
         clock: Clock = time.monotonic,
-    ):
+    ) -> None:
         self.config = config
         self.accelerator = accelerator
         self.checkpoint_dir = Path(checkpoint_dir)
@@ -124,8 +126,8 @@ class UltronTelemetry:
     @classmethod
     def setup_accelerator_trackers(
         cls,
-        config,
-        args,
+        config: Any,
+        args: Any,
         checkpoint_dir: str = "accelerate_checkpoint",
     ) -> Accelerator:
         """Create Accelerator and configure a resumable W&B tracker."""
@@ -170,16 +172,16 @@ class UltronTelemetry:
         return accelerator
 
     @staticmethod
-    def _wandb_run(accelerator: Any):
+    def _wandb_run(accelerator: Any) -> Any:
         if not accelerator.is_main_process:
             return None
         return accelerator.get_tracker("wandb", unwrap=True)
 
     @classmethod
-    def _initialize_wandb_summary(cls, config, accelerator: Any) -> None:
+    def _initialize_wandb_summary(cls, config: Any, accelerator: Any) -> None:
         """Populate immutable run totals before the first metric is logged."""
         try:
-            run: Any = cls._wandb_run(accelerator)
+            run: Any = cls._wandb_run(accelerator=accelerator)
             if run is None:
                 return
             tokens_per_step = (
@@ -201,7 +203,7 @@ class UltronTelemetry:
             )
         except (AttributeError, KeyError, RuntimeError, ValueError) as error:
             warnings.warn(
-                f"W&B summary could not be initialized: {error}",
+                message=f"W&B summary could not be initialized: {error}",
                 stacklevel=2,
             )
 
@@ -212,7 +214,7 @@ class UltronTelemetry:
         try:
             import wandb
 
-            wandb.define_metric("train/*")
+            wandb.define_metric(name="train/*")
             wandb.define_metric("eval/*")
             wandb.define_metric("perf/*")
             wandb.define_metric(
@@ -385,7 +387,7 @@ class UltronTelemetry:
         self._train_loss_samples = 0
         return average
 
-    def _build_loss_comparison_chart(self):
+    def _build_loss_comparison_chart(self) -> Any:
         """Build the compact train-average versus sampled-dev W&B chart."""
         if not self.accelerator.is_main_process:
             return None
@@ -487,7 +489,7 @@ class TokenizationTelemetry:
         *,
         clock: Clock = time.monotonic,
         enabled: bool = True,
-    ):
+    ) -> None:
         if target_tokens <= 0:
             raise ValueError("target_tokens must be greater than zero")
         if start_tokens < 0 or start_tokens > target_tokens:
@@ -582,7 +584,7 @@ class ValidationTelemetry:
     @classmethod
     def setup_accelerator(
         cls,
-        config,
+        config: Any,
         *,
         project_name: str | None = None,
         run_name: str | None = None,
@@ -628,7 +630,7 @@ class ValidationTelemetry:
         accelerator: Any,
         *,
         clock: Clock = time.monotonic,
-    ):
+    ) -> None:
         if total_sequences <= 0:
             raise ValueError("total_sequences must be greater than zero")
         if sequence_length <= 0:

@@ -57,7 +57,7 @@ def validate_complete_shard_set(shards_dir: Path) -> dict:
     return state
 
 
-def main():
+def main() -> None:
     config = UltronConfig()
     parser = argparse.ArgumentParser(
         description="Upload Ultron FineWeb-Edu binary dataset shards to Hugging Face Hub"

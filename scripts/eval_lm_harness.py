@@ -191,7 +191,7 @@ def main() -> None:
     )
     accelerator.print(
         "\nRunning EleutherAI lm-evaluation-harness across "
-        f"{task_list} (limit: {eval_limit if eval_limit else 'FULL'})...\n"
+        f"{task_list} (limit: {eval_limit or 'FULL'})...\n"
     )
     results = simple_evaluate(
         model=evaluation_model,

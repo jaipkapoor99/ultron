@@ -62,6 +62,9 @@ jobs:
       - name: Run Pyrefly Type Check
         run: .venv/bin/pyrefly check .
 
+      - name: Run Markdown Formatter Check
+        run: .venv/bin/mdformat --check *.md docs/*.md
+
       - name: Compile Python sources
         run: |
           .venv/bin/python -m compileall -q \

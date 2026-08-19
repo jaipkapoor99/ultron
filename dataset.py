@@ -9,6 +9,7 @@ import glob
 import os
 from bisect import bisect_right
 from collections.abc import Generator, Sized
+from typing import Any
 
 import numpy as np
 import torch
@@ -42,7 +43,12 @@ class EpochRandomSampler(Sampler[int]):
 class ZeroCopyShardedDataset(Dataset):
     """Memory-mapped dataset with process-local, lazily opened shard views."""
 
-    def __init__(self, bin_shards, sequence_length=1024, step=None) -> None:
+    def __init__(
+        self,
+        bin_shards: Any,
+        sequence_length: int = 1024,
+        step: int | None = None,
+    ) -> None:
         self.bin_shards = list(bin_shards)
         self.T = sequence_length
         self.step = sequence_length if step is None else step
@@ -55,8 +61,7 @@ class ZeroCopyShardedDataset(Dataset):
         # complete corpus into RAM.
         self._shard_memmaps = {}
         self._memmap_owner_pid = None
-        self.shard_offsets = []
-        # pyrefly: ignore [unknown-name]
+        self.shard_offsets: list[tuple[int, int]] = []
         self.shard_ends: list[int] = []
         total_sequences = 0
 
@@ -69,7 +74,7 @@ class ZeroCopyShardedDataset(Dataset):
 
         self.total_sequences = total_sequences
 
-    def __getstate__(self):
+    def __getstate__(self) -> dict[str, Any]:
         """Strip process-local mappings before spawn/forkserver serialization."""
         state = self.__dict__.copy()
         state["_shard_memmaps"] = {}
@@ -93,10 +98,10 @@ class ZeroCopyShardedDataset(Dataset):
             self._shard_memmaps[shard_idx] = mmap
         return mmap
 
-    def __len__(self):
+    def __len__(self) -> int:
         return self.total_sequences
 
-    def __getitem__(self, index: int):
+    def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
         idx = index
         if idx < 0:
             idx += self.total_sequences
@@ -119,7 +124,9 @@ class ZeroCopyShardedDataset(Dataset):
         return x, y
 
 
-def split_train_dev_datasets(bin_shards, sequence_length, step=None):
+def split_train_dev_datasets(
+    bin_shards: Any, sequence_length: int, step: int | None = None
+) -> tuple[Any, Any]:
     """Create leakage-safe train/dev datasets.
 
     Multiple-shard corpora are split at a shard boundary. A single-shard
@@ -158,7 +165,7 @@ def split_train_dev_datasets(bin_shards, sequence_length, step=None):
     )
 
 
-def get_dataloaders(config: UltronConfig, accelerator):
+def get_dataloaders(config: UltronConfig, accelerator: Any) -> tuple[Any, Any]:
     bin_shards = sorted(
         glob.glob("shards/fineweb_shard_*.bin")
         + glob.glob("shards_edu/fineweb_edu_shard_*.bin")
@@ -166,7 +173,7 @@ def get_dataloaders(config: UltronConfig, accelerator):
 
     if not bin_shards:
         if os.path.exists("fineweb_tokens.bin"):
-            bin_shards = ["fineweb_tokens.bin"]
+            bin_shards: list[str] = ["fineweb_tokens.bin"]
         else:
             raise FileNotFoundError(
                 "No binary dataset shards found! Run 'python tokenize_dataset.py' first."

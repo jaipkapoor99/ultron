@@ -125,14 +125,15 @@ def ban_repeated_ngrams(
 
     for batch_index in range(token_ids.size(0)):
         prefix = token_ids[batch_index, sequence_length - prefix_length :]
-        banned_tokens = []
         final_start = sequence_length - ngram_size
-        for start in range(final_start + 1):
+        banned_tokens = [
+            token_ids[batch_index, start + prefix_length]
+            for start in range(final_start + 1)
             if torch.equal(
                 token_ids[batch_index, start : start + prefix_length],
                 prefix,
-            ):
-                banned_tokens.append(token_ids[batch_index, start + prefix_length])
+            )
+        ]
         if banned_tokens:
             filtered[batch_index, torch.stack(banned_tokens)] = -torch.inf
     return filtered
@@ -316,7 +317,7 @@ def main() -> None:
     generator = torch.Generator(device=accelerator.device)
     generator.manual_seed(args.seed)
 
-    def selector(logits, tokens):
+    def selector(logits: torch.Tensor, tokens: torch.Tensor) -> torch.Tensor:
         return select_next_token(
             logits,
             tokens,

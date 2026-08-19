@@ -4,6 +4,7 @@ import json
 import os
 from contextlib import nullcontext
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 import torch
@@ -15,12 +16,12 @@ from trainer import UltronTrainer
 
 
 class TinyLanguageModel(torch.nn.Module):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self.embedding = torch.nn.Embedding(16, 8)
         self.head = torch.nn.Linear(8, 16)
 
-    def forward(self, inputs, targets=None):
+    def forward(self, inputs: torch.Tensor, targets: Any = None) -> Any:
         logits = self.head(self.embedding(inputs))
         loss = None
         if targets is not None:
@@ -38,69 +39,73 @@ class FakeAccelerator:
     device = torch.device("cpu")
     is_main_process = True
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.skipped_batches = None
         self.saved = 0
         self.loaded = 0
 
-    def accumulate(self, _model):
+    def accumulate(self, _model: Any) -> Any:
         return nullcontext()
 
-    def autocast(self):
+    def autocast(self) -> Any:
         return nullcontext()
 
-    def backward(self, loss):
+    def backward(self, loss: Any) -> None:
         loss.backward()
 
-    def clip_grad_norm_(self, parameters, max_norm):
+    def clip_grad_norm_(self, parameters: Any, max_norm: float) -> torch.Tensor:
         return torch.nn.utils.clip_grad_norm_(parameters, max_norm)
 
-    def reduce(self, tensor, reduction):
+    def reduce(self, tensor: torch.Tensor, reduction: str) -> torch.Tensor:
         assert reduction == "sum"
         return tensor
 
-    def skip_first_batches(self, dataloader, count):
+    def skip_first_batches(self, dataloader: Any, count: int) -> list[Any]:
         self.skipped_batches = count
         return list(dataloader)[count:]
 
-    def save_state(self, directory):
+    def save_state(self, directory: Any) -> None:
         self.saved += 1
         os.makedirs(directory, exist_ok=True)
 
-    def load_state(self, _directory):
+    def load_state(self, _directory: Any) -> None:
         self.loaded += 1
 
-    def wait_for_everyone(self):
+    def wait_for_everyone(self) -> None:
         pass
 
-    def print(self, _message):
+    def print(self, _message: Any) -> None:
         pass
 
 
 class FakeTelemetry:
-    def __init__(self):
-        self.evaluations = []
+    def __init__(self) -> None:
+        self.evaluations: list[tuple[int, float, float, float]] = []
 
-    def print_message(self, _message):
+    def print_message(self, _message: Any) -> None:
         pass
 
-    def update_terminal_progress(self, _step, loss):
+    def update_terminal_progress(self, _step: int, loss: float = 0.0) -> int:
         return 0
 
-    def log_training_step(self, **_kwargs):
+    def log_training_step(self, **_kwargs: Any) -> None:
         pass
 
-    def log_evaluation(self, step, train_loss, dev_loss, lr):
+    def log_evaluation(
+        self, step: int, train_loss: float, dev_loss: float, lr: float
+    ) -> None:
         self.evaluations.append((step, train_loss, dev_loss, lr))
 
-    def get_wandb_run_id(self):
+    def get_wandb_run_id(self) -> None:
         return None
 
-    def close(self):
+    def close(self) -> None:
         pass
 
 
-def make_trainer(max_steps=2, is_test_mode=True, num_processes=1):
+def make_trainer(
+    max_steps: int = 2, is_test_mode: bool = True, num_processes: int = 1
+) -> UltronTrainer:
     inputs = torch.randint(0, 16, (4, 6))
     targets = torch.roll(inputs, shifts=-1, dims=1)
     dataloader = DataLoader(TensorDataset(inputs, targets), batch_size=1)
@@ -133,7 +138,7 @@ def make_trainer(max_steps=2, is_test_mode=True, num_processes=1):
     return trainer
 
 
-def test_training_pipeline_reaches_evaluation_without_checkpointing():
+def test_training_pipeline_reaches_evaluation_without_checkpointing() -> None:
     trainer = make_trainer()
 
     trainer.train()
@@ -143,7 +148,7 @@ def test_training_pipeline_reaches_evaluation_without_checkpointing():
     assert trainer.accelerator.saved == 0
 
 
-def test_resume_skips_consumed_batches():
+def test_resume_skips_consumed_batches() -> None:
     trainer = make_trainer(max_steps=2)
     trainer.step = 1
 
@@ -157,7 +162,9 @@ def test_resume_skips_consumed_batches():
     ("step", "expected"),
     [(0, (0, 0)), (1, (0, 1)), (3, (0, 3)), (4, (1, 0)), (9, (2, 1))],
 )
-def test_data_position_crosses_shuffle_epochs_exactly(step, expected):
+def test_data_position_crosses_shuffle_epochs_exactly(
+    step: int, expected: tuple[int, int]
+) -> None:
     trainer = make_trainer(max_steps=10)
 
     assert trainer._data_position(step) == expected
@@ -166,7 +173,7 @@ def test_data_position_crosses_shuffle_epochs_exactly(step, expected):
         trainer._data_position(-1)
 
 
-def test_sampled_validation_rotates_and_wraps_batches():
+def test_sampled_validation_rotates_and_wraps_batches() -> None:
     trainer = make_trainer()
     trainer.config.eval_batches = 2
     expected = list(trainer.dev_loader)
@@ -183,14 +190,14 @@ def test_sampled_validation_rotates_and_wraps_batches():
     assert trainer.dev_batch_cursor == 2
 
 
-def test_custom_test_length_remains_checkpoint_safe():
+def test_custom_test_length_remains_checkpoint_safe() -> None:
     config = build_config(SimpleNamespace(mode="test", max_steps=7))
 
     assert config.is_test_mode is True
     assert config.max_steps == 7
 
 
-def test_learning_rate_schedule_hits_warmup_stable_and_decay_boundaries():
+def test_learning_rate_schedule_hits_warmup_stable_and_decay_boundaries() -> None:
     trainer = make_trainer(max_steps=10)
     trainer.config.warmup_steps = 2
     trainer.config.learning_rate = 1e-2
@@ -207,14 +214,14 @@ def test_learning_rate_schedule_hits_warmup_stable_and_decay_boundaries():
     assert trainer.update_learning_rate() == pytest.approx(1e-3)
 
 
-def test_total_training_tokens_come_from_runtime_configuration():
+def test_total_training_tokens_come_from_runtime_configuration() -> None:
     trainer = make_trainer(max_steps=7, num_processes=3)
 
     assert trainer.tokens_per_step == 1 * 1 * 6 * 3
     assert trainer.total_training_tokens == 1 * 1 * 6 * 3 * 7
 
 
-def test_only_main_process_writes_checkpoint_metadata(tmp_path):
+def test_only_main_process_writes_checkpoint_metadata(tmp_path: Any) -> None:
     trainer = make_trainer(is_test_mode=False)
     trainer.accelerate_dir = str(tmp_path / "checkpoint")
     trainer.accelerator.is_main_process = False
@@ -238,7 +245,9 @@ def test_only_main_process_writes_checkpoint_metadata(tmp_path):
     assert state["model_config"] == trainer.config.to_metadata()
 
 
-def test_checkpoint_load_restores_step_and_validation_cursor(tmp_path):
+def test_checkpoint_load_restores_step_and_validation_cursor(
+    tmp_path: Any,
+) -> None:
     trainer = make_trainer()
     trainer.accelerate_dir = str(tmp_path / "checkpoint")
     os.makedirs(trainer.accelerate_dir)
@@ -252,7 +261,7 @@ def test_checkpoint_load_restores_step_and_validation_cursor(tmp_path):
     assert trainer.dev_batch_cursor == 2
 
 
-def test_checkpoint_load_rejects_shuffle_seed_drift(tmp_path):
+def test_checkpoint_load_rejects_shuffle_seed_drift(tmp_path: Any) -> None:
     trainer = make_trainer()
     trainer.accelerate_dir = str(tmp_path / "checkpoint")
     os.makedirs(trainer.accelerate_dir)

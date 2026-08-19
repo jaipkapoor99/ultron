@@ -1,6 +1,7 @@
 """CPU-safe tests for generation policy and checkpoint metadata."""
 
 import json
+from typing import Any
 
 import pytest
 import torch
@@ -17,7 +18,7 @@ from scripts.generate import (
 )
 
 
-def test_checkpoint_metadata_restores_exact_config(tmp_path):
+def test_checkpoint_metadata_restores_exact_config(tmp_path: Any) -> None:
     config = UltronConfig(C=384, n_head=6, n_kv_head=2, n_layer=4)
     (tmp_path / "training_state.json").write_text(
         json.dumps(
@@ -34,7 +35,9 @@ def test_checkpoint_metadata_restores_exact_config(tmp_path):
     assert state["step"] == 12
 
 
-def test_legacy_checkpoint_metadata_warns_and_uses_defaults(tmp_path):
+def test_legacy_checkpoint_metadata_warns_and_uses_defaults(
+    tmp_path: Any,
+) -> None:
     (tmp_path / "training_state.json").write_text(json.dumps({"step": 12}))
 
     with pytest.warns(RuntimeWarning, match="no saved model_config"):
@@ -44,7 +47,7 @@ def test_legacy_checkpoint_metadata_warns_and_uses_defaults(tmp_path):
     assert state["step"] == 12
 
 
-def test_greedy_selection_ignores_sampling_controls():
+def test_greedy_selection_ignores_sampling_controls() -> None:
     logits = torch.tensor([[0.0, 4.0, 1.0]])
     tokens = torch.tensor([[0]])
 
@@ -63,7 +66,7 @@ def test_greedy_selection_ignores_sampling_controls():
     assert selected.tolist() == [[1]]
 
 
-def test_cli_accepts_multiple_prompts():
+def test_cli_accepts_multiple_prompts() -> None:
     args = build_parser().parse_args(
         [
             "--prompt",
@@ -79,7 +82,7 @@ def test_cli_accepts_multiple_prompts():
     assert args.samples == 3
 
 
-def test_cli_defaults_match_recommended_sampling_policy():
+def test_cli_defaults_match_recommended_sampling_policy() -> None:
     args = build_parser().parse_args([])
 
     assert args.max_tokens == 70
@@ -95,7 +98,7 @@ def test_cli_defaults_match_recommended_sampling_policy():
     assert args.ignore_eos is False
 
 
-def test_seeded_sampling_is_reproducible():
+def test_seeded_sampling_is_reproducible() -> None:
     logits = torch.zeros(2, 8)
     tokens = torch.tensor([[0, 1], [2, 3]])
     first_generator = torch.Generator().manual_seed(42)
@@ -126,7 +129,7 @@ def test_seeded_sampling_is_reproducible():
     assert torch.equal(first, second)
 
 
-def test_top_k_filter_retains_only_requested_candidates():
+def test_top_k_filter_retains_only_requested_candidates() -> None:
     logits = torch.tensor([[1.0, 4.0, 3.0, 2.0]])
 
     filtered = filter_logits(logits, top_k=2, top_p=1.0, min_p=0.0)
@@ -134,7 +137,7 @@ def test_top_k_filter_retains_only_requested_candidates():
     assert torch.isfinite(filtered).tolist() == [[False, True, True, False]]
 
 
-def test_repetition_penalty_reduces_seen_positive_logits():
+def test_repetition_penalty_reduces_seen_positive_logits() -> None:
     logits = torch.tensor([[1.0, 4.0, 3.0]])
     tokens = torch.tensor([[1]])
 
@@ -143,7 +146,7 @@ def test_repetition_penalty_reduces_seen_positive_logits():
     assert penalized.tolist() == [[1.0, 2.0, 3.0]]
 
 
-def test_no_repeat_ngram_bans_only_repeated_continuations():
+def test_no_repeat_ngram_bans_only_repeated_continuations() -> None:
     logits = torch.zeros(2, 8)
     tokens = torch.tensor(
         [
@@ -159,7 +162,7 @@ def test_no_repeat_ngram_bans_only_repeated_continuations():
     assert torch.isfinite(filtered[1]).all()
 
 
-def test_no_repeat_ngram_changes_token_selection():
+def test_no_repeat_ngram_changes_token_selection() -> None:
     logits = torch.tensor([[0.0, 1.0, 2.0, 10.0]])
     tokens = torch.tensor([[1, 2, 3, 1, 2]])
 
@@ -189,7 +192,7 @@ def test_no_repeat_ngram_changes_token_selection():
         (["--no-repeat-ngram-size", "-1"], "--no-repeat-ngram-size"),
     ],
 )
-def test_invalid_cli_values_are_rejected(arguments, message):
+def test_invalid_cli_values_are_rejected(arguments: list[str], message: str) -> None:
     args = build_parser().parse_args(arguments)
 
     with pytest.raises(ValueError, match=message):

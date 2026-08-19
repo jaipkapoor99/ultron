@@ -22,7 +22,7 @@ from config import UltronConfig
 console = Console()
 
 
-def main():
+def main() -> None:
     config = UltronConfig()
     parser = argparse.ArgumentParser(
         description="Upload Ultron checkpoint to Hugging Face Hub"
@@ -79,8 +79,8 @@ def main():
     console.print("[bold green]✅ Checkpoint files uploaded successfully![/bold green]")
 
     # 2. Upload Model Card (accelerate_checkpoint/README.md)
-    model_card_path = os.path.join(args.checkpoint_dir, "README.md")
-    if os.path.exists(model_card_path):
+    model_card_path: str = os.path.join(args.checkpoint_dir, "README.md")
+    if os.path.exists(path=model_card_path):
         console.print(
             f"[bold blue]📄 Syncing model card '{model_card_path}' to Hugging Face Hub...[/bold blue]"
         )
@@ -92,7 +92,7 @@ def main():
         )
         console.print("[bold green]✅ Model card synced successfully![/bold green]")
 
-    if os.path.exists("metadata.yaml"):
+    if os.path.exists(path="metadata.yaml"):
         console.print("[bold blue]⚙️ Syncing metadata.yaml configuration...[/bold blue]")
         api.upload_file(
             path_or_fileobj="metadata.yaml",

@@ -1,11 +1,14 @@
 """Complete training-state uploader regression tests."""
 
 import sys
+from typing import Any
 
 from scripts import upload_checkpoint
 
 
-def test_checkpoint_uploader_does_not_filter_training_state(tmp_path, monkeypatch):
+def test_checkpoint_uploader_does_not_filter_training_state(
+    tmp_path: Any, monkeypatch: Any
+) -> None:
     checkpoint_dir = tmp_path / "accelerate_checkpoint"
     checkpoint_dir.mkdir()
     expected_files = {
@@ -20,13 +23,13 @@ def test_checkpoint_uploader_does_not_filter_training_state(tmp_path, monkeypatc
         (checkpoint_dir / filename).touch()
 
     class FakeApi:
-        def __init__(self):
-            self.upload_kwargs = None
+        def __init__(self) -> None:
+            self.upload_kwargs: dict[str, Any] | None = None
 
-        def create_repo(self, **_kwargs):
+        def create_repo(self, **_kwargs: Any) -> None:
             pass
 
-        def upload_folder(self, **kwargs):
+        def upload_folder(self, **kwargs: Any) -> None:
             self.upload_kwargs = kwargs
 
     api = FakeApi()
@@ -54,18 +57,18 @@ def test_checkpoint_uploader_does_not_filter_training_state(tmp_path, monkeypatc
 
 
 def test_checkpoint_uploader_stops_before_hub_writes_when_directory_missing(
-    tmp_path,
-    monkeypatch,
-):
+    tmp_path: Any,
+    monkeypatch: Any,
+) -> None:
     class FakeApi:
-        def __init__(self):
+        def __init__(self) -> None:
             self.created = False
             self.uploaded = False
 
-        def create_repo(self, **_kwargs):
+        def create_repo(self, **_kwargs: Any) -> None:
             self.created = True
 
-        def upload_folder(self, **_kwargs):
+        def upload_folder(self, **_kwargs: Any) -> None:
             self.uploaded = True
 
     api = FakeApi()

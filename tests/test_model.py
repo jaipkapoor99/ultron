@@ -2,6 +2,7 @@
 
 import os
 import sys
+from typing import Any
 
 import pytest
 import torch
@@ -18,7 +19,7 @@ from model import (
 )
 
 
-def tiny_config(**overrides):
+def tiny_config(**overrides: Any) -> UltronConfig:
     values = {
         "B": 2,
         "T": 32,
@@ -34,12 +35,12 @@ def tiny_config(**overrides):
 
 
 @pytest.fixture
-def model():
+def model() -> UltronModel:
     torch.manual_seed(0)
     return UltronModel(tiny_config()).eval()
 
 
-def test_config_defaults():
+def test_config_defaults() -> None:
     config = UltronConfig()
     assert config.C == 768
     assert config.n_head == 12
@@ -50,13 +51,13 @@ def test_config_defaults():
     assert config.eval_batches == 20
 
 
-def test_documented_parameter_count():
+def test_documented_parameter_count() -> None:
     with torch.device("meta"):
         model = UltronModel(UltronConfig())
     assert sum(parameter.numel() for parameter in model.parameters()) == 113_266_944
 
 
-def test_forward_shape_and_loss(model):
+def test_forward_shape_and_loss(model: UltronModel) -> None:
     inputs = torch.randint(0, model.config.vocab_size, (2, 12))
     targets = torch.randint(0, model.config.vocab_size, (2, 12))
     output = model(inputs, targets=targets)
@@ -66,7 +67,9 @@ def test_forward_shape_and_loss(model):
     assert torch.isfinite(output.loss)
 
 
-def test_forward_rejects_context_longer_than_configured(model):
+def test_forward_rejects_context_longer_than_configured(
+    model: UltronModel,
+) -> None:
     inputs = torch.randint(
         0,
         model.config.vocab_size,
@@ -77,7 +80,7 @@ def test_forward_rejects_context_longer_than_configured(model):
         model(inputs)
 
 
-def test_loss_ignores_masked_targets(model):
+def test_loss_ignores_masked_targets(model: UltronModel) -> None:
     inputs = torch.randint(0, model.config.vocab_size, (1, 6))
     targets = torch.randint(0, model.config.vocab_size, (1, 6))
     targets[:, -2:] = -1
@@ -91,7 +94,7 @@ def test_loss_ignores_masked_targets(model):
     torch.testing.assert_close(output.loss, expected)
 
 
-def test_future_tokens_do_not_change_prefix_logits(model):
+def test_future_tokens_do_not_change_prefix_logits(model: UltronModel) -> None:
     inputs = torch.randint(0, model.config.vocab_size, (2, 12))
     changed = inputs.clone()
     changed[:, 7:] = torch.randint(0, model.config.vocab_size, changed[:, 7:].shape)
@@ -103,7 +106,7 @@ def test_future_tokens_do_not_change_prefix_logits(model):
     torch.testing.assert_close(original_logits[:, :7], changed_logits[:, :7])
 
 
-def test_cached_decoding_matches_full_forward(model):
+def test_cached_decoding_matches_full_forward(model: UltronModel) -> None:
     inputs = torch.randint(0, model.config.vocab_size, (2, 12))
 
     with torch.no_grad():
@@ -127,7 +130,7 @@ def test_cached_decoding_matches_full_forward(model):
     )
 
 
-def test_checkpoint_loader_allows_only_tied_alias(model):
+def test_checkpoint_loader_allows_only_tied_alias(model: UltronModel) -> None:
     state_dict = dict(model.state_dict())
     state_dict.pop("lm_head.weight")
 
@@ -145,7 +148,7 @@ def test_checkpoint_loader_allows_only_tied_alias(model):
     )
 
 
-def test_checkpoint_loader_rejects_other_missing_keys(model):
+def test_checkpoint_loader_rejects_other_missing_keys(model: UltronModel) -> None:
     state_dict = dict(model.state_dict())
     state_dict.pop("transformer.h.0.attn.c_attn.weight")
 
@@ -153,7 +156,7 @@ def test_checkpoint_loader_rejects_other_missing_keys(model):
         load_ultron_state_dict(UltronModel(tiny_config()), state_dict)
 
 
-def test_checkpoint_loader_accepts_compiled_prefixes(model):
+def test_checkpoint_loader_accepts_compiled_prefixes(model: UltronModel) -> None:
     state_dict = {
         f"_orig_mod.{key}": value for key, value in model.state_dict().items()
     }
@@ -169,7 +172,7 @@ def test_checkpoint_loader_accepts_compiled_prefixes(model):
     )
 
 
-def test_checkpoint_loader_rejects_unexpected_keys(model):
+def test_checkpoint_loader_rejects_unexpected_keys(model: UltronModel) -> None:
     state_dict = dict(model.state_dict())
     state_dict["not_a_real_parameter"] = torch.zeros(1)
 
@@ -177,7 +180,7 @@ def test_checkpoint_loader_rejects_unexpected_keys(model):
         load_ultron_state_dict(UltronModel(tiny_config()), state_dict)
 
 
-def test_optimizer_partition_is_complete_and_disjoint(model):
+def test_optimizer_partition_is_complete_and_disjoint(model: UltronModel) -> None:
     partitions = model.partition_optimizer_parameters()
     grouped = [parameter for group in partitions.values() for parameter in group]
     trainable = [
@@ -194,7 +197,7 @@ def test_optimizer_partition_is_complete_and_disjoint(model):
     assert all(parameter.ndim < 2 for parameter in partitions["adamw_decay"])
 
 
-def test_uses_official_muon(model):
+def test_uses_official_muon(model: UltronModel) -> None:
     optimizer_muon, optimizer_adamw = model.configure_optimizers(
         model.config.learning_rate
     )
@@ -208,7 +211,9 @@ def test_uses_official_muon(model):
     ]
 
 
-def test_generation_preserves_batch_and_returns_valid_token_ids(model):
+def test_generation_preserves_batch_and_returns_valid_token_ids(
+    model: UltronModel,
+) -> None:
     torch.manual_seed(11)
     prompt = torch.randint(0, model.config.vocab_size, (2, 5))
 
@@ -220,7 +225,7 @@ def test_generation_preserves_batch_and_returns_valid_token_ids(model):
     assert generated.max() < model.config.vocab_size
 
 
-def test_generation_delegates_token_selection(model):
+def test_generation_delegates_token_selection(model: UltronModel) -> None:
     prompt = torch.randint(0, model.config.vocab_size, (2, 5))
     selected_token = 17
 
@@ -238,7 +243,9 @@ def test_generation_delegates_token_selection(model):
     assert generated[:, -3:].tolist() == [[selected_token] * 3] * 2
 
 
-def test_generation_stops_when_every_sequence_reaches_eos(model):
+def test_generation_stops_when_every_sequence_reaches_eos(
+    model: UltronModel,
+) -> None:
     prompt = torch.randint(0, model.config.vocab_size, (2, 5))
     eos_token_id = 3
 
@@ -258,7 +265,7 @@ def test_generation_stops_when_every_sequence_reaches_eos(model):
     assert generated[:, -1].tolist() == [eos_token_id, eos_token_id]
 
 
-def test_generation_rejects_invalid_selector_output(model):
+def test_generation_rejects_invalid_selector_output(model: UltronModel) -> None:
     prompt = torch.randint(0, model.config.vocab_size, (2, 5))
 
     with pytest.raises(ValueError, match="shape"):
@@ -272,7 +279,7 @@ def test_generation_rejects_invalid_selector_output(model):
         )
 
 
-def test_repeated_batch_can_be_learned():
+def test_repeated_batch_can_be_learned() -> None:
     torch.manual_seed(7)
     config = tiny_config(C=16, n_head=2, n_kv_head=1, n_layer=1, vocab_size=32)
     model = UltronModel(config).train()
@@ -298,7 +305,7 @@ def test_repeated_batch_can_be_learned():
     assert final_loss < initial_loss * 0.5
 
 
-def test_rmsnorm_has_unit_mean_square():
+def test_rmsnorm_has_unit_mean_square() -> None:
     norm = RMSNorm(64)
     output = norm(torch.randn(2, 10, 64))
     mean_square = output.pow(2).mean(-1)
@@ -310,7 +317,7 @@ def test_rmsnorm_has_unit_mean_square():
     )
 
 
-def test_rotary_embedding_preserves_shape(model):
+def test_rotary_embedding_preserves_shape(model: UltronModel) -> None:
     query = torch.randn(2, model.config.n_head, 16, model.config.head_dim)
     cosine, sine = model.rotary_emb(query, 16)
     rotated = apply_rotary_emb(query, cosine, sine)
@@ -324,7 +331,9 @@ def test_rotary_embedding_preserves_shape(model):
         {"C": 32, "n_head": 4, "n_kv_head": 3},
     ],
 )
-def test_config_rejects_incompatible_attention_dimensions(overrides):
+def test_config_rejects_incompatible_attention_dimensions(
+    overrides: dict[str, Any],
+) -> None:
     with pytest.raises(AssertionError):
         tiny_config(**overrides)
 
@@ -333,7 +342,7 @@ def test_config_rejects_incompatible_attention_dimensions(overrides):
     os.environ.get("ULTRON_TEST_COMPILE") != "1",
     reason="set ULTRON_TEST_COMPILE=1 to run the slower compiler smoke test",
 )
-def test_torch_compile_forward(model):
+def test_torch_compile_forward(model: UltronModel) -> None:
     compiled = torch.compile(model)
     inputs = torch.randint(0, model.config.vocab_size, (2, 12))
     assert compiled(inputs).logits.shape == (2, 12, model.config.vocab_size)
