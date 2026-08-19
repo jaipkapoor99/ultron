@@ -56,11 +56,15 @@ class FakeMainAccelerator(FakeAccelerator):
 def test_fresh_wandb_run_name_starts_with_timestamp(
     monkeypatch: Any,
 ) -> None:
-    monkeypatch.setenv("ULTRON_RUN_NAME", "pretraining")
     now = datetime(2026, 8, 6, 19, 33, 56, tzinfo=UTC)
 
-    assert wandb_run_name("fresh", now) == "20260806-193356-pretraining"
-    assert wandb_run_name("continue", now) == "pretraining"
+    # Default pretrain and SFT names
+    assert wandb_run_name("pretrain", now) == "20260806-193356-ultron-113m-pretrain"
+    assert wandb_run_name("sft", now) == "20260806-193356-ultron-113m-sft"
+
+    # Custom override
+    monkeypatch.setenv("ULTRON_RUN_NAME", "custom-experiment")
+    assert wandb_run_name("pretrain", now) == "20260806-193356-custom-experiment"
 
 
 def test_rolling_rate_uses_recent_cumulative_samples() -> None:
@@ -194,10 +198,13 @@ def test_metric_definitions_use_native_wandb_step(monkeypatch: Any) -> None:
 
 
 def test_wandb_run_id_uses_unwrapped_tracker() -> None:
+    accelerator = FakeMainAccelerator()
+    accelerator.run.name = "20260806-193356-ultron-113m-pretrain"
     config = SimpleNamespace(B=2, T=10, max_steps=20)
-    telemetry = UltronTelemetry(config, FakeMainAccelerator())
+    telemetry = UltronTelemetry(config, accelerator)
 
     assert telemetry.get_wandb_run_id() == "run-123"
+    assert telemetry.get_wandb_run_name() == "20260806-193356-ultron-113m-pretrain"
 
 
 def test_wandb_summary_contains_run_totals_and_live_results(

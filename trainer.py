@@ -30,8 +30,12 @@ class UltronTrainer:
         self.step = 0
         self.dev_batch_cursor = 0
         self.decay_start_step = int(0.8 * config.max_steps)
+        task_type = "sft" if "sft" in self.accelerate_dir else "pretrain"
         self.telemetry: Any = UltronTelemetry(
-            config, accelerator, checkpoint_dir=self.accelerate_dir
+            config,
+            accelerator,
+            checkpoint_dir=self.accelerate_dir,
+            task_type=task_type,
         )
         self.tokens_per_step = self.telemetry.global_tokens_per_step
         self.total_training_tokens = self.tokens_per_step * config.max_steps
@@ -170,13 +174,11 @@ class UltronTrainer:
             raise RuntimeError("Validation dataloader produced no tokens")
         avg_dev_loss = (totals[0] / totals[1]).item()
 
-        self.print_table_row(self.step, train_loss, avg_dev_loss, lr)
-        # This is a sampled estimate capped at 20 validation batches.
         self.telemetry.log_evaluation(
-            self.step,
-            train_loss,
-            avg_dev_loss,
-            lr,
+            step=self.step,
+            train_loss=train_loss,
+            dev_loss=avg_dev_loss,
+            lr=lr,
         )
         self.save_checkpoint()
         self.model.train()
@@ -188,7 +190,7 @@ class UltronTrainer:
         self.accelerator.save_state(self.accelerate_dir)
         self.accelerator.wait_for_everyone()
 
-        # Persist the current step and wandb run ID so we can resume correctly
+        # Persist the current step and wandb run ID & name so we can resume correctly
         state_payload = {
             "step": self.step,
             "max_steps": self.config.max_steps,
@@ -196,9 +198,12 @@ class UltronTrainer:
             "dev_batch_cursor": self.dev_batch_cursor,
             "model_config": self.config.to_metadata(),
         }
-        run_id = self.telemetry.get_wandb_run_id()
+        run_id = getattr(self.telemetry, "get_wandb_run_id", lambda: None)()
+        run_name = getattr(self.telemetry, "get_wandb_run_name", lambda: None)()
         if run_id:
             state_payload["wandb_run_id"] = run_id
+        if run_name:
+            state_payload["wandb_run_name"] = run_name
 
         if self.accelerator.is_main_process:
             state_file = os.path.join(self.accelerate_dir, "training_state.json")
@@ -214,8 +219,11 @@ class UltronTrainer:
     def train(self) -> None:
         self.model.train()
 
+        label = (
+            "Supervised Fine-Tuning" if "sft" in self.accelerate_dir else "Pre-training"
+        )
         self.print_rich(
-            f"[bold yellow]⚡ Pre-training for {self.config.max_steps:,} steps ({self.total_training_tokens:,} total tokens)...[/bold yellow]\n"
+            f"[bold yellow]⚡ {label} for {self.config.max_steps:,} steps ({self.total_training_tokens:,} total tokens)...[/bold yellow]\n"
         )
         # Training loop without tqdm progress bar
 

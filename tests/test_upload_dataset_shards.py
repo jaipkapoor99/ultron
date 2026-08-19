@@ -6,7 +6,7 @@ from typing import Any
 import numpy as np
 import pytest
 
-from scripts.upload_dataset_shards import validate_complete_shard_set
+from sharding import validate_complete_shard_set
 
 
 def write_complete_set(
@@ -42,6 +42,34 @@ def test_complete_shard_set_is_accepted(tmp_path: Any) -> None:
     expected = write_complete_set(tmp_path)
 
     assert validate_complete_shard_set(tmp_path) == expected
+
+
+def test_complete_sft_shard_set_is_accepted(tmp_path: Any) -> None:
+    state = {
+        "max_shards": 2,
+        "next_shard": 2,
+        "shard_size_tokens": 8,
+        "committed_tokens": 16,
+    }
+    (tmp_path / "tokenization_state.json").write_text(json.dumps(state))
+    for index in range(2):
+        np.arange(8, dtype=np.uint16).tofile(
+            tmp_path / f"smoltalk_shard_{index:04d}_inputs.bin"
+        )
+        np.arange(8, dtype=np.int32).tofile(
+            tmp_path / f"smoltalk_shard_{index:04d}_targets.bin"
+        )
+        metadata = {
+            "shard_index": index,
+            "tokens": 8,
+            "inputs_dtype": "uint16",
+            "targets_dtype": "int32",
+        }
+        (tmp_path / f"smoltalk_shard_{index:04d}_meta.json").write_text(
+            json.dumps(metadata)
+        )
+
+    assert validate_complete_shard_set(tmp_path, is_sft=True) == state
 
 
 def test_incomplete_shard_set_is_rejected(tmp_path: Any) -> None:
@@ -113,3 +141,36 @@ def test_every_metadata_contract_field_is_validated(
 
     with pytest.raises(RuntimeError, match="inconsistent"):
         validate_complete_shard_set(tmp_path)
+
+
+def test_upload_dataset_shards_invokes_hf_api(
+    tmp_path: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from sharding.uploader import upload_dataset_shards
+
+    write_complete_set(tmp_path)
+
+    calls: list[str] = []
+
+    class FakeHfApi:
+        def __init__(self, token: str | None = None) -> None:
+            pass
+
+        def create_repo(
+            self, repo_id: str, repo_type: str, exist_ok: bool, private: bool
+        ) -> None:
+            calls.append(f"create_repo:{repo_id}")
+
+        def upload_large_folder(self, **kwargs: Any) -> None:
+            calls.append("upload_large_folder")
+
+    monkeypatch.setattr("sharding.uploader.HfApi", FakeHfApi)
+
+    upload_dataset_shards(
+        target_repo="test/repo",
+        shards_dir=tmp_path,
+        is_sft=False,
+        private=False,
+    )
+    assert "create_repo:test/repo" in calls
+    assert "upload_large_folder" in calls

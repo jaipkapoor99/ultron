@@ -99,6 +99,9 @@ class FakeTelemetry:
     def get_wandb_run_id(self) -> None:
         return None
 
+    def get_wandb_run_name(self) -> None:
+        return None
+
     def close(self) -> None:
         pass
 

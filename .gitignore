@@ -2,12 +2,15 @@
 *.bin
 shards/
 shards_edu/
+shards_sft/
+.pending_tokens_*.npy
 
 # Model Weights & Checkpoints
 *.pth
 *.pt
 *.safetensors
 accelerate_checkpoint/
+accelerate_sft_checkpoint/
 *.tar.gz
 *.tar
 
@@ -23,6 +26,7 @@ archives/
 __pycache__/
 *.pyc
 .pytest_cache/
+.ruff_cache/
 .venv/
 .coverage
 coverage.xml

@@ -132,8 +132,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--output",
+        "--output-json",
+        dest="output",
         type=Path,
         default=Path("logs/pre_training_checkpoint_eval.json"),
+        help="JSON file path to store benchmark results",
     )
     return parser
 

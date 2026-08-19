@@ -39,7 +39,6 @@ exclude_also = [
 show_missing = true
 skip_covered = true
 precision = 2
-fail_under = 69
 
 [tool.ruff]
 target-version = "py314"

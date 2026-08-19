@@ -1,8 +1,4 @@
-"""
-Ultron Configuration Module
-Contains dataclass parameters for the Ultron (113M) architecture.
-"""
-
+import os
 from dataclasses import dataclass, field, fields
 from typing import Any
 
@@ -38,10 +34,20 @@ class UltronConfig:
     )
     dataset_config: str = "sample-10BT"  # Source dataset configuration
     dataset_split: str = "train"  # Source dataset split
-    hf_repo_id: str = (
-        "jaipkapoor99/ultron-113m"  # Hugging Face Hub model repository identifier
+    sft_dataset_id: str = "HuggingFaceTB/smoltalk"  # SFT instruction dataset identifier
+    sft_dataset_config: str = "all"  # SFT instruction dataset configuration
+    sft_dataset_split: str = "train"  # SFT instruction dataset split
+    hf_username: str = field(
+        default_factory=lambda: os.environ.get("HF_USERNAME", "jaipkapoor99")
     )
-    hf_dataset_repo_id: str = "jaipkapoor99/ultron-fineweb-edu-shards"  # Hugging Face Hub dataset repository identifier
+    hf_repo_id: str = ""  # Hugging Face Hub model repository identifier
+    hf_instruct_repo_id: str = (
+        ""  # Hugging Face Hub instruct model repository identifier
+    )
+    hf_dataset_repo_id: str = ""  # Hugging Face Hub dataset repository identifier
+    hf_sft_dataset_repo_id: str = (
+        ""  # Hugging Face Hub SFT dataset repository identifier
+    )
     is_test_mode: bool = False  # Transient test mode flag for quick sanity passes
     head_dim: int = field(init=False)
 
@@ -53,6 +59,14 @@ class UltronConfig:
             f"n_head ({self.n_head}) must be divisible by n_kv_head ({self.n_kv_head})"
         )
         self.head_dim = self.C // self.n_head
+        if not self.hf_repo_id:
+            self.hf_repo_id = f"{self.hf_username}/ultron-113m"
+        if not self.hf_instruct_repo_id:
+            self.hf_instruct_repo_id = f"{self.hf_username}/ultron-113m-instruct"
+        if not self.hf_dataset_repo_id:
+            self.hf_dataset_repo_id = f"{self.hf_username}/ultron-fineweb-edu-shards"
+        if not self.hf_sft_dataset_repo_id:
+            self.hf_sft_dataset_repo_id = f"{self.hf_username}/ultron-smoltalk-shards"
 
     @classmethod
     def from_metadata(cls, **overrides: Any) -> UltronConfig:

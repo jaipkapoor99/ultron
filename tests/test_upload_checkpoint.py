@@ -24,13 +24,13 @@ def test_checkpoint_uploader_does_not_filter_training_state(
 
     class FakeApi:
         def __init__(self) -> None:
-            self.upload_kwargs: dict[str, Any] | None = None
+            self.uploaded_files: list[dict[str, Any]] = []
 
         def create_repo(self, **_kwargs: Any) -> None:
             pass
 
-        def upload_folder(self, **kwargs: Any) -> None:
-            self.upload_kwargs = kwargs
+        def upload_file(self, **kwargs: Any) -> None:
+            self.uploaded_files.append(kwargs)
 
     api = FakeApi()
     monkeypatch.chdir(tmp_path)
@@ -50,10 +50,8 @@ def test_checkpoint_uploader_does_not_filter_training_state(
     upload_checkpoint.main()
 
     assert {path.name for path in checkpoint_dir.iterdir()} == expected_files
-    assert api.upload_kwargs is not None
-    assert api.upload_kwargs["folder_path"] == str(checkpoint_dir)
-    assert "allow_patterns" not in api.upload_kwargs
-    assert "ignore_patterns" not in api.upload_kwargs
+    uploaded_names = {call["path_in_repo"] for call in api.uploaded_files}
+    assert expected_files.issubset(uploaded_names)
 
 
 def test_checkpoint_uploader_stops_before_hub_writes_when_directory_missing(
@@ -68,7 +66,7 @@ def test_checkpoint_uploader_stops_before_hub_writes_when_directory_missing(
         def create_repo(self, **_kwargs: Any) -> None:
             self.created = True
 
-        def upload_folder(self, **_kwargs: Any) -> None:
+        def upload_file(self, **_kwargs: Any) -> None:
             self.uploaded = True
 
     api = FakeApi()

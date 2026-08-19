@@ -21,13 +21,17 @@ from tqdm import tqdm
 Clock = Callable[[], float]
 
 
-def wandb_run_name(run_mode: str, now: datetime | None = None) -> str:
-    """Return a timestamped name for fresh runs and a stable resume name."""
-    base_name = os.environ.get("ULTRON_RUN_NAME", run_mode)
-    if run_mode != "fresh":
-        return base_name
+def wandb_run_name(
+    task_type: str = "pretrain",
+    now: datetime | None = None,
+) -> str:
+    """Return a timestamped run name for a fresh training or fine-tuning run."""
     timestamp = (now or datetime.now().astimezone()).strftime("%Y%m%d-%H%M%S")
-    return f"{timestamp}-{base_name}"
+    custom_name = os.environ.get("ULTRON_RUN_NAME")
+    if custom_name:
+        return f"{timestamp}-{custom_name}"
+    suffix = "sft" if task_type == "sft" else "pretrain"
+    return f"{timestamp}-ultron-113m-{suffix}"
 
 
 @dataclass(frozen=True)
@@ -81,7 +85,7 @@ def format_rate(rate: float, unit: str) -> str:
 
 
 class UltronTelemetry:
-    """W&B metrics, rolling throughput, ETA, and terminal progress."""
+    """W&B metrics, rolling throughput, ETA, and minimal terminal progress."""
 
     PROJECT_NAME = "ultron-pretraining"
     TRAIN_LOSS_METRIC = "train/loss"
@@ -101,11 +105,13 @@ class UltronTelemetry:
         checkpoint_dir: str = "accelerate_checkpoint",
         *,
         clock: Clock = time.monotonic,
+        task_type: str = "pretrain",
     ) -> None:
         self.config = config
         self.accelerator = accelerator
         self.checkpoint_dir = Path(checkpoint_dir)
         self.clock = clock
+        self.task_type = task_type
         self.rate_meter = RollingRateMeter(self.RATE_WINDOW_SECONDS, clock)
         self.pbar: tqdm | None = None
         self.last_render_time = float("-inf")
@@ -129,8 +135,11 @@ class UltronTelemetry:
         config: Any,
         args: Any,
         checkpoint_dir: str = "accelerate_checkpoint",
+        *,
+        task_type: str = "pretrain",
+        project_name: str | None = None,
     ) -> Accelerator:
-        """Create Accelerator and configure a resumable W&B tracker."""
+        """Create Accelerator and configure a resumable W&B tracker with persistent run ID and name."""
         is_test = getattr(args, "mode", None) == "test" or getattr(
             config, "is_test_mode", False
         )
@@ -141,29 +150,45 @@ class UltronTelemetry:
             )
 
         run_mode = getattr(args, "mode", "continue")
-        wandb_options: dict[str, Any] = {
-            "name": wandb_run_name(run_mode),
-            "resume": "never" if run_mode == "fresh" else "allow",
-        }
         state_path = Path(checkpoint_dir) / "training_state.json"
+
+        saved_run_id: str | None = None
+        saved_run_name: str | None = None
         if run_mode == "continue" and state_path.exists():
             try:
                 with state_path.open() as file:
-                    run_id = json.load(file).get("wandb_run_id")
-                if run_id:
-                    wandb_options["id"] = run_id
+                    state_data = json.load(file)
+                    saved_run_id = state_data.get("wandb_run_id")
+                    saved_run_name = state_data.get("wandb_run_name")
             except (OSError, json.JSONDecodeError) as error:
                 warnings.warn(
                     f"Could not read W&B resume metadata from {state_path}: {error}",
                     stacklevel=2,
                 )
 
+        if saved_run_id:
+            wandb_options: dict[str, Any] = {
+                "id": saved_run_id,
+                "resume": "must",
+            }
+            if saved_run_name:
+                wandb_options["name"] = saved_run_name
+        else:
+            fresh_name = wandb_run_name(task_type)
+            wandb_options = {
+                "name": fresh_name,
+                "resume": "never" if run_mode == "fresh" else "allow",
+            }
+
         accelerator = Accelerator(
             gradient_accumulation_steps=config.grad_accum_steps,
             log_with="wandb",
         )
+        target_project = project_name or (
+            "ultron-sft" if task_type == "sft" else cls.PROJECT_NAME
+        )
         accelerator.init_trackers(
-            cls.PROJECT_NAME,
+            target_project,
             config=dataclasses.asdict(config),
             init_kwargs={"wandb": wandb_options},
         )
@@ -266,12 +291,23 @@ class UltronTelemetry:
                 self._tracker_warning_emitted = True
             return None
 
+    def get_wandb_run_name(self) -> str | None:
+        """Return the active W&B run name, warning once on tracker failures."""
+        if not self.accelerator.is_main_process:
+            return None
+        try:
+            run = self._wandb_run(self.accelerator)
+            return getattr(run, "name", None)
+        except KeyError, RuntimeError, AttributeError:
+            return None
+
     def _init_pbar(self, initial_step: int) -> None:
         if self.accelerator.is_main_process and self.pbar is None:
+            desc = "🎯 SFT" if self.task_type == "sft" else "⚡ Pre-training"
             self.pbar = tqdm(
                 total=self.config.max_steps,
                 initial=initial_step,
-                desc="⚡ Pre-training",
+                desc=desc,
                 unit="step",
                 dynamic_ncols=True,
                 leave=True,
@@ -484,15 +520,17 @@ class TokenizationTelemetry:
 
     def __init__(
         self,
-        target_tokens: int,
+        target_tokens: int | None = None,
         start_tokens: int = 0,
         *,
         clock: Clock = time.monotonic,
         enabled: bool = True,
     ) -> None:
-        if target_tokens <= 0:
+        if target_tokens is not None and target_tokens <= 0:
             raise ValueError("target_tokens must be greater than zero")
-        if start_tokens < 0 or start_tokens > target_tokens:
+        if start_tokens < 0 or (
+            target_tokens is not None and start_tokens > target_tokens
+        ):
             raise ValueError("start_tokens must be within the target range")
         self.target_tokens = target_tokens
         self.current_total = start_tokens
@@ -535,24 +573,33 @@ class TokenizationTelemetry:
 
         snapshot = self.rate_meter.update(current_total)
         tokens_per_second = snapshot.units_per_second
-        remaining_tokens = max(0, self.target_tokens - current_total)
-        eta_seconds = (
-            int(remaining_tokens / tokens_per_second) if tokens_per_second > 0 else 0
-        )
+        if self.target_tokens is not None:
+            remaining_tokens = max(0, self.target_tokens - current_total)
+            eta_seconds = (
+                int(remaining_tokens / tokens_per_second)
+                if tokens_per_second > 0
+                else 0
+            )
+        else:
+            eta_seconds = 0
         self.last_tokens_per_second = tokens_per_second
         self.last_eta_seconds = eta_seconds
 
         now = self.clock()
         should_render = (
-            current_total >= self.target_tokens
-            or now - self.last_render_time >= self.RENDER_INTERVAL_SECONDS
-        )
+            self.target_tokens is not None and current_total >= self.target_tokens
+        ) or now - self.last_render_time >= self.RENDER_INTERVAL_SECONDS
         if self.pbar is not None and should_render:
-            self.pbar.n = min(current_total, self.target_tokens)
+            self.pbar.n = (
+                min(current_total, self.target_tokens)
+                if self.target_tokens is not None
+                else current_total
+            )
             postfix = {
                 "tok/s": format_rate(tokens_per_second, "tok"),
-                "ETA": f"{eta_seconds // 60:d}m" if eta_seconds else "—",
             }
+            if self.target_tokens is not None and eta_seconds:
+                postfix["ETA"] = f"{eta_seconds // 60:d}m"
             if shard_info:
                 postfix["shard"] = shard_info
             self.pbar.set_postfix(postfix, refresh=True)

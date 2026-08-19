@@ -339,10 +339,16 @@ def test_config_rejects_incompatible_attention_dimensions(
 
 
 @pytest.mark.skipif(
-    os.environ.get("ULTRON_TEST_COMPILE") != "1",
-    reason="set ULTRON_TEST_COMPILE=1 to run the slower compiler smoke test",
+    os.environ.get("CI") == "true" and os.environ.get("ULTRON_TEST_COMPILE") != "1",
+    reason="Compiler test skipped in CI unless ULTRON_TEST_COMPILE=1",
 )
 def test_torch_compile_forward(model: UltronModel) -> None:
-    compiled = torch.compile(model)
-    inputs = torch.randint(0, model.config.vocab_size, (2, 12))
-    assert compiled(inputs).logits.shape == (2, 12, model.config.vocab_size)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    target_model = model.to(device)
+    compiled = torch.compile(target_model)
+    inputs = torch.randint(0, target_model.config.vocab_size, (2, 12), device=device)
+    assert compiled(inputs).logits.shape == (
+        2,
+        12,
+        target_model.config.vocab_size,
+    )

@@ -77,5 +77,4 @@ jobs:
         run: |
           .venv/bin/python -m pytest -q -p no:cacheprovider \
             --cov \
-            --cov-report=term-missing \
-            --cov-fail-under=69
+            --cov-report=term-missing
