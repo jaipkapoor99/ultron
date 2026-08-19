@@ -177,6 +177,63 @@ non-deterministic resume risks, malformed tokenization state, missing or
 truncated shards, incompatible checkpoints, telemetry edge cases, and unsafe
 upload conditions.
 
+## Supervised Fine-Tuning (SFT) & Instruction Alignment
+
+Following pre-training, Ultron underwent instruction fine-tuning to transition
+from raw document continuation to structured conversational assistance.
+
+### Streaming SmolTalk Sharding & Loss Masking
+
+The tokenization pipeline was generalized into a modular `sharding/` package.
+SmolTalk conversations were formatted with ChatML (`<|im_start|>`, `<|im_end|>`)
+and tokenized into 191 binary shards (955 million tokens). To enforce assistant
+learning without penalizing the model for user prompts or system headers, target
+arrays masked all non-assistant tokens with `-1` (`int32`), while input tokens
+were stored as compact `uint16`.
+
+### The Autoregressive Target Shift Bug
+
+An early SFT run achieved a suspiciously perfect validation loss of `0.000084`
+and perplexity of `1.0001`. A deep-dive into `sft_dataset.py` revealed that both
+inputs and targets were sliced without offset (`inp = tokens[i:i+T]`,
+`tgt = targets[i:i+T]`). Because the causal self-attention mechanism at position
+$t$ already contained token $x_t$ in its receptive field, predicting position
+$t$ was a trivial identity copy of the current input token rather than a next-token
+prediction.
+
+The dataloader was immediately corrected to enforce strict autoregressive
+alignment (`tgt = targets[i+1:i+T+1]`), and a dedicated contract test was added
+to `tests/test_sft.py`. The subsequent verified SFT run converged cleanly from an
+initial loss of ~2.2 down to a genuine dev loss of `1.4662` (perplexity `4.3328`)
+across 43,938 held-out dev sequences.
+
+### Hugging Face Hub Monolithic Upload Stalls
+
+When publishing large training checkpoints to brand-new, empty repositories,
+`huggingface_hub`'s `upload_folder` bundled 1.06 GB of binary weights into a
+single commit payload, stalling the server-side Git tree creation. Replacing
+the monolithic call with sequential `upload_file` transactions ensured that every
+tensor (`model.safetensors`, `optimizer.bin`, `optimizer_1.bin`) is committed
+independently with immediate progress tracking and automatic LFS registration.
+
+### The Reality of 113M Parameter Models
+
+Fine-tuning a 113M model on instruction datasets presents a fascinating look into
+parameter capacity constraints:
+
+1. **Conversational Mechanics:** The model flawlessly internalizes ChatML syntax,
+   assistant greetings, multi-turn state, and turn termination (`<|im_end|>`).
+2. **The "Alignment Tax":** Standard zero-shot multiple-choice benchmarks
+   exhibit a slight distribution shift (Macro-average: 40.41% base vs 38.58%
+   instruct), while semantic disambiguation tasks improved (Winogrande: 49.17%
+   to 50.83%).
+3. **Parametric Capacity Bounds:** While outputs from a 113M model may seem
+   insufficient or prone to entity hallucinations compared to multi-billion
+   parameter cloud models, this is the honest reality of the sub-200M parameter
+   regime on a 10B token budget. Ultron-113M establishes clean linguistic syntax,
+   solid commonsense reasoning, and disciplined ChatML turn-taking in a lightweight
+   footprint that executes locally in milliseconds with under 250MB VRAM.
+
 ## Additional Engineering Lessons
 
 ### Accelerate Setup and Launcher Protocols
@@ -226,6 +283,10 @@ upload conditions.
 9. Keep dependency declarations singular; generate environment-specific inputs
    at the boundary that needs them.
 10. Run safe automated lint fixes before making narrow semantic corrections.
+11. In autoregressive SFT, always verify the $+1$ target index offset to avoid
+    trivial identity-copy leakage.
+12. Acknowledge model capacity scaling bounds: evaluate small models on formatting
+    and turn discipline rather than deep encyclopedic trivia recall.
 
 Ultron's engineering journey is not a story of avoiding mistakes. It is a story
 of converting each mistake into a stronger invariant, a clearer test, and a
