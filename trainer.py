@@ -1,8 +1,8 @@
 import json
 import os
+from typing import Any
 
 import torch
-from accelerate import Accelerator
 
 from telemetry import UltronTelemetry
 
@@ -16,7 +16,7 @@ class UltronTrainer:
         train_loader,
         dev_loader,
         config,
-        accelerator: Accelerator,
+        accelerator: Any,
     ):
         self.model = model
         self.optimizer_muon = optimizer_muon
@@ -24,13 +24,13 @@ class UltronTrainer:
         self.train_loader = train_loader
         self.dev_loader = dev_loader
         self.config = config
-        self.accelerator = accelerator
+        self.accelerator: Any = accelerator
 
         self.accelerate_dir = "accelerate_checkpoint"
         self.step = 0
         self.dev_batch_cursor = 0
         self.decay_start_step = int(0.8 * config.max_steps)
-        self.telemetry = UltronTelemetry(
+        self.telemetry: Any = UltronTelemetry(
             config, accelerator, checkpoint_dir=self.accelerate_dir
         )
         self.tokens_per_step = self.telemetry.global_tokens_per_step

@@ -131,7 +131,10 @@ def _load_resume_state(
     if not pending_path.is_file():
         raise RuntimeError(f"Resume token buffer is missing: {pending_path}")
     pending_tokens = np.load(pending_path, allow_pickle=False)
-    if pending_tokens.dtype != np.uint16 or len(pending_tokens) != state["pending_tokens"]:
+    if (
+        pending_tokens.dtype != np.uint16
+        or len(pending_tokens) != state["pending_tokens"]
+    ):
         raise RuntimeError("Resume token buffer does not match checkpoint metadata.")
     return state, pending_tokens
 
@@ -215,8 +218,12 @@ def main(shard_size_tokens: int = 100_000_000, max_shards: int = 100) -> None:
 
     if state is None:
         api = HfApi()
-        dataset_revision = api.dataset_info(config.dataset_id).sha
-        tokenizer_revision = api.model_info(config.tokenizer_name).sha
+        dataset_info = api.dataset_info(config.dataset_id)
+        tokenizer_info = api.model_info(config.tokenizer_name)
+        if dataset_info.sha is None or tokenizer_info.sha is None:
+            raise RuntimeError("Failed to resolve dataset or tokenizer revision sha.")
+        dataset_revision = str(dataset_info.sha)
+        tokenizer_revision = str(tokenizer_info.sha)
         state = _new_state(
             config,
             dataset_revision,
@@ -239,6 +246,8 @@ def main(shard_size_tokens: int = 100_000_000, max_shards: int = 100) -> None:
         state["tokenizer_name"],
         revision=state["tokenizer_revision"],
     )
+    if tokenizer is None or tokenizer.vocab_size is None:
+        raise ValueError("Failed to load tokenizer or vocabulary size.")
     if tokenizer.vocab_size > np.iinfo(np.uint16).max:
         raise ValueError("Tokenizer vocabulary does not fit in uint16 shards.")
     eos_token_id = tokenizer.eos_token_id
@@ -330,7 +339,9 @@ def main(shard_size_tokens: int = 100_000_000, max_shards: int = 100) -> None:
                 current_tokens = current_tokens[shard_size_tokens:]
 
                 shard_path = output_dir / f"fineweb_edu_shard_{shard_index:04d}.bin"
-                meta_path = output_dir / f"fineweb_edu_shard_{shard_index:04d}_meta.json"
+                meta_path = (
+                    output_dir / f"fineweb_edu_shard_{shard_index:04d}_meta.json"
+                )
                 _atomic_shard_write(shard_path, shard_values)
                 _atomic_json_write(
                     meta_path,
@@ -361,9 +372,7 @@ def main(shard_size_tokens: int = 100_000_000, max_shards: int = 100) -> None:
                     current_tokens,
                     previous_pending_file=previous_pending_file,
                 )
-                state["pending_tokens_file"] = (
-                    f".pending_tokens_{shard_index:04d}.npy"
-                )
+                state["pending_tokens_file"] = f".pending_tokens_{shard_index:04d}.npy"
                 telemetry.print_message(
                     f"✓ Atomically committed shard {shard_index - 1:04d}"
                 )

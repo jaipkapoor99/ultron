@@ -30,12 +30,33 @@ def build_config(args):
 
 def main():
     parser = argparse.ArgumentParser(description="Ultron (113M) Pre-training")
-    parser.add_argument("--mode", type=str, choices=["fresh", "continue", "test"], default="continue", help="Training execution mode: 'fresh', 'continue' (default), or 'test'")
-    parser.add_argument("--max-steps", type=int, default=None, help="Optional max training steps override (e.g. --max-steps=1000)")
+    parser.add_argument(
+        "--mode",
+        type=str,
+        choices=["fresh", "continue", "test"],
+        default="continue",
+        help="Training execution mode: 'fresh', 'continue' (default), or 'test'",
+    )
+    parser.add_argument(
+        "--max-steps",
+        type=int,
+        default=None,
+        help="Optional max training steps override (e.g. --max-steps=1000)",
+    )
     args = parser.parse_args()
 
-    if not any(k in os.environ for k in ["ACCELERATE_TORCH_DEVICE", "ACCELERATE_PROCESS_ID", "LOCAL_RANK", "ACCELERATE_MIXED_PRECISION"]):
-        raise RuntimeError("train.py must be launched using HuggingFace Accelerate!\nRun: accelerate launch train.py [--mode=fresh|continue|test] [--max-steps=N]")
+    if not any(
+        k in os.environ
+        for k in [
+            "ACCELERATE_TORCH_DEVICE",
+            "ACCELERATE_PROCESS_ID",
+            "LOCAL_RANK",
+            "ACCELERATE_MIXED_PRECISION",
+        ]
+    ):
+        raise RuntimeError(
+            "train.py must be launched using HuggingFace Accelerate!\nRun: accelerate launch train.py [--mode=fresh|continue|test] [--max-steps=N]"
+        )
 
     try:
         config = build_config(args)
@@ -43,21 +64,33 @@ def main():
         parser.error(str(error))
 
     from telemetry import UltronTelemetry
+
     accelerator = UltronTelemetry.setup_accelerator_trackers(config, args)
 
     train_loader, dev_loader = get_dataloaders(config, accelerator)
 
     model = UltronModel(config)
-    torch.set_float32_matmul_precision('high')
+    torch.set_float32_matmul_precision("high")
 
     # Muon (2D weight matrices) + AdamW (embeddings, norms, biases)
     optimizer_muon, optimizer_adamw = model.configure_optimizers(config.learning_rate)
 
     model = torch.compile(model)
-    model, optimizer_muon, optimizer_adamw = accelerator.prepare(model, optimizer_muon, optimizer_adamw)
+    model, optimizer_muon, optimizer_adamw = accelerator.prepare(
+        model, optimizer_muon, optimizer_adamw
+    )
 
     from trainer import UltronTrainer
-    trainer = UltronTrainer(model, optimizer_muon, optimizer_adamw, train_loader, dev_loader, config, accelerator)
+
+    trainer = UltronTrainer(
+        model,
+        optimizer_muon,
+        optimizer_adamw,
+        train_loader,
+        dev_loader,
+        config,
+        accelerator,
+    )
 
     # Load checkpoint depending on --mode=fresh|continue|test
     if args.mode == "test" or args.mode == "fresh":

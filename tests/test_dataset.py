@@ -4,7 +4,7 @@ import pickle
 
 import numpy as np
 import pytest
-from torch.utils.data import DataLoader, SequentialSampler
+from torch.utils.data import DataLoader, SequentialSampler, Subset
 
 from config import UltronConfig
 from dataset import (
@@ -133,8 +133,7 @@ def test_windows_never_cross_shard_boundaries(tmp_path):
 
 def test_multiple_shards_split_at_shard_boundary(tmp_path):
     shards = [
-        write_shard(tmp_path / f"{index}.bin", index * 100, 20)
-        for index in range(3)
+        write_shard(tmp_path / f"{index}.bin", index * 100, 20) for index in range(3)
     ]
 
     train_ds, dev_ds = split_train_dev_datasets(
@@ -143,6 +142,8 @@ def test_multiple_shards_split_at_shard_boundary(tmp_path):
         step=4,
     )
 
+    assert isinstance(train_ds, ZeroCopyShardedDataset)
+    assert isinstance(dev_ds, ZeroCopyShardedDataset)
     assert train_ds.bin_shards == shards[:2]
     assert dev_ds.bin_shards == shards[2:]
 
@@ -155,6 +156,8 @@ def test_single_shard_split_leaves_non_overlapping_gap(tmp_path):
         step=2,
     )
 
+    assert isinstance(train_ds, Subset)
+    assert isinstance(dev_ds, Subset)
     last_train_index = train_ds.indices[-1]
     first_dev_index = dev_ds.indices[0]
     last_train_token = last_train_index * 2 + 8

@@ -8,6 +8,7 @@ embeddings require.
 import glob
 import os
 from bisect import bisect_right
+from collections.abc import Generator, Sized
 
 import numpy as np
 import torch
@@ -19,7 +20,7 @@ from config import UltronConfig
 class EpochRandomSampler(Sampler[int]):
     """Deterministically shuffle indices using a distinct permutation per epoch."""
 
-    def __init__(self, data_source: Dataset, seed: int):
+    def __init__(self, data_source: Sized, seed: int) -> None:
         self.data_source = data_source
         self.seed = seed
         self.epoch = 0
@@ -29,7 +30,7 @@ class EpochRandomSampler(Sampler[int]):
             raise ValueError("epoch cannot be negative")
         self.epoch = epoch
 
-    def __iter__(self):
+    def __iter__(self) -> Generator[int]:
         indices = np.arange(len(self.data_source), dtype=np.int32)
         np.random.default_rng(self.seed + self.epoch).shuffle(indices)
         return (int(index) for index in indices)
@@ -41,7 +42,7 @@ class EpochRandomSampler(Sampler[int]):
 class ZeroCopyShardedDataset(Dataset):
     """Memory-mapped dataset with process-local, lazily opened shard views."""
 
-    def __init__(self, bin_shards, sequence_length=1024, step=None):
+    def __init__(self, bin_shards, sequence_length=1024, step=None) -> None:
         self.bin_shards = list(bin_shards)
         self.T = sequence_length
         self.step = sequence_length if step is None else step
@@ -55,11 +56,12 @@ class ZeroCopyShardedDataset(Dataset):
         self._shard_memmaps = {}
         self._memmap_owner_pid = None
         self.shard_offsets = []
-        self.shard_ends = []
+        # pyrefly: ignore [unknown-name]
+        self.shard_ends: list[int] = []
         total_sequences = 0
 
         for shard_path in self.bin_shards:
-            num_tokens = os.path.getsize(shard_path) // 2 # uint16 = 2 bytes
+            num_tokens = os.path.getsize(shard_path) // 2  # uint16 = 2 bytes
             num_seqs = max(0, (num_tokens - (self.T + 1)) // self.step + 1)
             self.shard_offsets.append((total_sequences, total_sequences + num_seqs))
             total_sequences += num_seqs
@@ -94,11 +96,14 @@ class ZeroCopyShardedDataset(Dataset):
     def __len__(self):
         return self.total_sequences
 
-    def __getitem__(self, idx):
+    def __getitem__(self, index: int):
+        idx = index
         if idx < 0:
             idx += self.total_sequences
         if idx < 0 or idx >= self.total_sequences:
-            raise IndexError(f"Index {idx} out of range for dataset size {self.total_sequences}")
+            raise IndexError(
+                f"Index {idx} out of range for dataset size {self.total_sequences}"
+            )
 
         shard_idx = bisect_right(self.shard_ends, idx)
         start_seq, _ = self.shard_offsets[shard_idx]
@@ -109,8 +114,8 @@ class ZeroCopyShardedDataset(Dataset):
         mmap = self._get_shard_memmap(shard_idx)
         chunk = mmap[token_start : token_start + self.T + 1].astype(np.int64)
 
-        x = torch.from_numpy(chunk[:self.T])
-        y = torch.from_numpy(chunk[1:self.T + 1])
+        x = torch.from_numpy(chunk[: self.T])
+        y = torch.from_numpy(chunk[1 : self.T + 1])
         return x, y
 
 
@@ -152,18 +157,25 @@ def split_train_dev_datasets(bin_shards, sequence_length, step=None):
         Subset(full_ds, range(dev_start, len(full_ds))),
     )
 
+
 def get_dataloaders(config: UltronConfig, accelerator):
-    bin_shards = sorted(glob.glob("shards/fineweb_shard_*.bin") + glob.glob("shards_edu/fineweb_edu_shard_*.bin"))
-    
+    bin_shards = sorted(
+        glob.glob("shards/fineweb_shard_*.bin")
+        + glob.glob("shards_edu/fineweb_edu_shard_*.bin")
+    )
+
     if not bin_shards:
         if os.path.exists("fineweb_tokens.bin"):
             bin_shards = ["fineweb_tokens.bin"]
         else:
-            raise FileNotFoundError("No binary dataset shards found! Run 'python tokenize_dataset.py' first.")
+            raise FileNotFoundError(
+                "No binary dataset shards found! Run 'python tokenize_dataset.py' first."
+            )
 
+    accelerator.print(
+        f"Loading {len(bin_shards)} binary shard(s) via memory mapping..."
+    )
 
-    accelerator.print(f"Loading {len(bin_shards)} binary shard(s) via memory mapping...")
-    
     train_ds, dev_ds = split_train_dev_datasets(
         bin_shards,
         sequence_length=config.T,
@@ -177,7 +189,7 @@ def get_dataloaders(config: UltronConfig, accelerator):
     accelerator.print(
         f"Sequences Available: {len(train_ds):,} train / {len(dev_ds):,} dev"
     )
-    
+
     train_sampler = EpochRandomSampler(train_ds, seed=config.data_seed)
     train_loader = DataLoader(
         train_ds,
@@ -195,8 +207,6 @@ def get_dataloaders(config: UltronConfig, accelerator):
         pin_memory=False,
     )
 
-    train_loader, dev_loader = accelerator.prepare(
-        train_loader, dev_loader
-    )
-    
+    train_loader, dev_loader = accelerator.prepare(train_loader, dev_loader)
+
     return train_loader, dev_loader

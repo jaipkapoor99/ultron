@@ -243,9 +243,7 @@ def test_checkpoint_load_restores_step_and_validation_cursor(tmp_path):
     trainer.accelerate_dir = str(tmp_path / "checkpoint")
     os.makedirs(trainer.accelerate_dir)
     state_file = tmp_path / "checkpoint" / "training_state.json"
-    state_file.write_text(
-        json.dumps({"step": 9, "dev_batch_cursor": 6})
-    )
+    state_file.write_text(json.dumps({"step": 9, "dev_batch_cursor": 6}))
 
     trainer.load_checkpoint()
 

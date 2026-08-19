@@ -47,6 +47,7 @@ def test_checkpoint_uploader_does_not_filter_training_state(tmp_path, monkeypatc
     upload_checkpoint.main()
 
     assert {path.name for path in checkpoint_dir.iterdir()} == expected_files
+    assert api.upload_kwargs is not None
     assert api.upload_kwargs["folder_path"] == str(checkpoint_dir)
     assert "allow_patterns" not in api.upload_kwargs
     assert "ignore_patterns" not in api.upload_kwargs

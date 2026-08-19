@@ -54,10 +54,7 @@ class RollingRateMeter:
             self.samples.clear()
         self.samples.append((now, float(total_units)))
 
-        while (
-            len(self.samples) > 2
-            and now - self.samples[0][0] > self.window_seconds
-        ):
+        while len(self.samples) > 2 and now - self.samples[0][0] > self.window_seconds:
             self.samples.popleft()
 
         first_time, first_units = self.samples[0]
@@ -98,7 +95,7 @@ class UltronTelemetry:
     def __init__(
         self,
         config,
-        accelerator: Accelerator,
+        accelerator: Any,
         checkpoint_dir: str = "accelerate_checkpoint",
         *,
         clock: Clock = time.monotonic,
@@ -132,9 +129,8 @@ class UltronTelemetry:
         checkpoint_dir: str = "accelerate_checkpoint",
     ) -> Accelerator:
         """Create Accelerator and configure a resumable W&B tracker."""
-        is_test = (
-            getattr(args, "mode", None) == "test"
-            or getattr(config, "is_test_mode", False)
+        is_test = getattr(args, "mode", None) == "test" or getattr(
+            config, "is_test_mode", False
         )
         if is_test:
             return Accelerator(
@@ -174,16 +170,16 @@ class UltronTelemetry:
         return accelerator
 
     @staticmethod
-    def _wandb_run(accelerator: Accelerator):
+    def _wandb_run(accelerator: Any):
         if not accelerator.is_main_process:
             return None
         return accelerator.get_tracker("wandb", unwrap=True)
 
     @classmethod
-    def _initialize_wandb_summary(cls, config, accelerator: Accelerator) -> None:
+    def _initialize_wandb_summary(cls, config, accelerator: Any) -> None:
         """Populate immutable run totals before the first metric is logged."""
         try:
-            run = cls._wandb_run(accelerator)
+            run: Any = cls._wandb_run(accelerator)
             if run is None:
                 return
             tokens_per_step = (
@@ -210,7 +206,7 @@ class UltronTelemetry:
             )
 
     @staticmethod
-    def _define_wandb_metrics(accelerator: Accelerator) -> None:
+    def _define_wandb_metrics(accelerator: Any) -> None:
         if not accelerator.is_main_process:
             return
         try:
@@ -294,9 +290,7 @@ class UltronTelemetry:
         tokens_per_second = steps_per_second * self.global_tokens_per_step
         remaining_steps = max(0, self.config.max_steps - current_step)
         eta_seconds = (
-            int(remaining_steps / steps_per_second)
-            if steps_per_second > 0
-            else 0
+            int(remaining_steps / steps_per_second) if steps_per_second > 0 else 0
         )
 
         self.last_steps_per_sec = steps_per_second
@@ -351,7 +345,7 @@ class UltronTelemetry:
         if not self.accelerator.is_main_process:
             return
         try:
-            run = self._wandb_run(self.accelerator)
+            run: Any = self._wandb_run(self.accelerator)
             if run is not None:
                 run.summary.update(dict(values))
         except (AttributeError, KeyError, RuntimeError, ValueError) as error:
@@ -456,7 +450,7 @@ class UltronTelemetry:
             average_train_loss,
         )
 
-        metrics = {
+        metrics: dict[str, Any] = {
             self.DEV_LOSS_METRIC: dev_loss,
             self.SAMPLED_DEV_LOSS_METRIC: dev_loss,
             self.TRAIN_LOSS_METRIC: train_loss,
@@ -541,9 +535,7 @@ class TokenizationTelemetry:
         tokens_per_second = snapshot.units_per_second
         remaining_tokens = max(0, self.target_tokens - current_total)
         eta_seconds = (
-            int(remaining_tokens / tokens_per_second)
-            if tokens_per_second > 0
-            else 0
+            int(remaining_tokens / tokens_per_second) if tokens_per_second > 0 else 0
         )
         self.last_tokens_per_second = tokens_per_second
         self.last_eta_seconds = eta_seconds
@@ -614,7 +606,7 @@ class ValidationTelemetry:
         return accelerator
 
     @classmethod
-    def _define_wandb_metrics(cls, accelerator: Accelerator) -> None:
+    def _define_wandb_metrics(cls, accelerator: Any) -> None:
         if not accelerator.is_main_process:
             return
         try:
@@ -633,7 +625,7 @@ class ValidationTelemetry:
         self,
         total_sequences: int,
         sequence_length: int,
-        accelerator: Accelerator,
+        accelerator: Any,
         *,
         clock: Clock = time.monotonic,
     ):
@@ -668,9 +660,7 @@ class ValidationTelemetry:
                 {
                     "validation/status": "running",
                     "validation/total_sequences": total_sequences,
-                    "validation/total_tokens": (
-                        total_sequences * sequence_length
-                    ),
+                    "validation/total_tokens": (total_sequences * sequence_length),
                     "validation/sequences_processed": 0,
                     "validation/tokens_processed": 0,
                     "validation/progress_percent": 0.0,
@@ -681,8 +671,9 @@ class ValidationTelemetry:
         if not self.accelerator.is_main_process:
             return
         try:
-            run = self.accelerator.get_tracker("wandb", unwrap=True)
-            run.summary.update(dict(values))
+            run: Any = self.accelerator.get_tracker("wandb", unwrap=True)
+            if run is not None:
+                run.summary.update(dict(values))
         except (AttributeError, KeyError, RuntimeError, ValueError) as error:
             if not self._tracker_warning_emitted:
                 warnings.warn(
@@ -715,9 +706,7 @@ class ValidationTelemetry:
             (self.total_sequences - processed_sequences) * self.sequence_length,
         )
         eta_seconds = (
-            int(remaining_tokens / tokens_per_second)
-            if tokens_per_second > 0
-            else 0
+            int(remaining_tokens / tokens_per_second) if tokens_per_second > 0 else 0
         )
         self.last_tokens_per_second = tokens_per_second
         self.last_eta_seconds = eta_seconds
@@ -728,9 +717,7 @@ class ValidationTelemetry:
             or now - self.last_render_time >= self.RENDER_INTERVAL_SECONDS
         )
         if self.accelerator.is_main_process and should_render:
-            progress_percent = (
-                100.0 * processed_sequences / self.total_sequences
-            )
+            progress_percent = 100.0 * processed_sequences / self.total_sequences
             self.accelerator.log(
                 {
                     self.LOSS_METRIC: mean_loss,
@@ -774,9 +761,7 @@ class ValidationTelemetry:
                 ),
                 "validation/progress_percent": 100.0,
                 "validation/elapsed_seconds": self.elapsed_seconds,
-                "validation/average_tokens_per_sec": (
-                    self.average_tokens_per_second
-                ),
+                "validation/average_tokens_per_sec": (self.average_tokens_per_second),
             }
         )
 

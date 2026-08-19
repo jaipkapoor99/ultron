@@ -14,8 +14,9 @@ source .venv/bin/activate
 uv pip install torch==2.13.0
 uv pip install -r pyproject.toml --group dev
 uv run --no-sync ruff check .
+uv run --no-sync ruff format --check .
+uv run --no-sync pyrefly check .
 uv run --no-sync python -m pytest -q --cov --cov-report=term-missing
-ULTRON_TEST_COMPILE=1 python -m pytest -q tests/test_model.py -k torch_compile
 accelerate launch train.py --mode=test
 accelerate launch scripts/generate.py --prompt "Hello" --samples 4
 ```

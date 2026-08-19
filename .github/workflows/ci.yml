@@ -53,8 +53,14 @@ jobs:
       - name: Validate dependencies
         run: uv pip check --python .venv/bin/python
 
-      - name: Run Ruff
+      - name: Run Ruff Linter
         run: .venv/bin/ruff check .
+
+      - name: Run Ruff Formatter Check
+        run: .venv/bin/ruff format --check .
+
+      - name: Run Pyrefly Type Check
+        run: .venv/bin/pyrefly check .
 
       - name: Compile Python sources
         run: |

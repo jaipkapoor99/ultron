@@ -136,7 +136,9 @@ def test_checkpoint_loader_allows_only_tied_alias(model):
 
     assert missing == ["lm_head.weight"]
     assert unexpected == []
-    assert restored.transformer.wte.weight.data_ptr() == restored.lm_head.weight.data_ptr()
+    assert (
+        restored.transformer.wte.weight.data_ptr() == restored.lm_head.weight.data_ptr()
+    )
     torch.testing.assert_close(
         restored.transformer.wte.weight,
         model.transformer.wte.weight,
@@ -153,8 +155,7 @@ def test_checkpoint_loader_rejects_other_missing_keys(model):
 
 def test_checkpoint_loader_accepts_compiled_prefixes(model):
     state_dict = {
-        f"_orig_mod.{key}": value
-        for key, value in model.state_dict().items()
+        f"_orig_mod.{key}": value for key, value in model.state_dict().items()
     }
     restored = UltronModel(tiny_config())
 
@@ -179,7 +180,9 @@ def test_checkpoint_loader_rejects_unexpected_keys(model):
 def test_optimizer_partition_is_complete_and_disjoint(model):
     partitions = model.partition_optimizer_parameters()
     grouped = [parameter for group in partitions.values() for parameter in group]
-    trainable = [parameter for parameter in model.parameters() if parameter.requires_grad]
+    trainable = [
+        parameter for parameter in model.parameters() if parameter.requires_grad
+    ]
 
     assert len(grouped) == len(trainable)
     assert len({id(parameter) for parameter in grouped}) == len(grouped)

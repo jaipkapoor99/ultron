@@ -137,9 +137,7 @@ def main() -> None:
         "tokens": total_sequences * config.T,
         "checkpoint": str(weight_path),
         "elapsed_seconds": validation_telemetry.elapsed_seconds,
-        "average_tokens_per_second": (
-            validation_telemetry.average_tokens_per_second
-        ),
+        "average_tokens_per_second": (validation_telemetry.average_tokens_per_second),
     }
     validation_telemetry.finish(
         loss=mean_loss,

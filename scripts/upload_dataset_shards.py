@@ -59,10 +59,26 @@ def validate_complete_shard_set(shards_dir: Path) -> dict:
 
 def main():
     config = UltronConfig()
-    parser = argparse.ArgumentParser(description="Upload Ultron FineWeb-Edu binary dataset shards to Hugging Face Hub")
-    parser.add_argument("--repo-id", type=str, default=config.hf_dataset_repo_id, help=f"Target Hugging Face Dataset Repo ID (default: {config.hf_dataset_repo_id})")
-    parser.add_argument("--shards-dir", type=str, default="shards_edu", help="Path to local shards directory")
-    parser.add_argument("--private", action="store_true", help="Set target dataset repository to private")
+    parser = argparse.ArgumentParser(
+        description="Upload Ultron FineWeb-Edu binary dataset shards to Hugging Face Hub"
+    )
+    parser.add_argument(
+        "--repo-id",
+        type=str,
+        default=config.hf_dataset_repo_id,
+        help=f"Target Hugging Face Dataset Repo ID (default: {config.hf_dataset_repo_id})",
+    )
+    parser.add_argument(
+        "--shards-dir",
+        type=str,
+        default="shards_edu",
+        help="Path to local shards directory",
+    )
+    parser.add_argument(
+        "--private",
+        action="store_true",
+        help="Set target dataset repository to private",
+    )
     args = parser.parse_args()
 
     token = os.environ.get("HF_TOKEN")
@@ -73,14 +89,18 @@ def main():
     state = validate_complete_shard_set(shards_dir)
 
     shard_count = state["max_shards"]
-    total_gib = state["committed_tokens"] * 2 / (1024 ** 3)
-    console.print(f"[bold cyan]🤗 Target Hugging Face Dataset Repository:[/bold cyan] [bold white]{args.repo_id}[/bold white]")
+    total_gib = state["committed_tokens"] * 2 / (1024**3)
+    console.print(
+        f"[bold cyan]🤗 Target Hugging Face Dataset Repository:[/bold cyan] [bold white]{args.repo_id}[/bold white]"
+    )
     console.print(
         f"Validated [bold yellow]{shard_count}[/bold yellow] binary shards "
         f"and metadata pairs ({total_gib:.2f} GiB)."
     )
 
-    api.create_repo(repo_id=args.repo_id, repo_type="dataset", exist_ok=True, private=args.private)
+    api.create_repo(
+        repo_id=args.repo_id, repo_type="dataset", exist_ok=True, private=args.private
+    )
 
     console.print(
         f"[bold blue]🚀 Resumably uploading '{shards_dir}' to the Datasets Hub...[/bold blue]"
@@ -97,7 +117,10 @@ def main():
             f"{directory_name}/fineweb_edu_shard_*_meta.json",
         ],
     )
-    console.print(f"[bold green]🎉 All dataset shards uploaded successfully to https://huggingface.co/datasets/{args.repo_id} ![/bold green]")
+    console.print(
+        f"[bold green]🎉 All dataset shards uploaded successfully to https://huggingface.co/datasets/{args.repo_id} ![/bold green]"
+    )
+
 
 if __name__ == "__main__":
     main()

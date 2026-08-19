@@ -79,9 +79,7 @@ def load_base_model(
             break
 
     if weight_file is None:
-        raise FileNotFoundError(
-            f"No checkpoint weights found in '{checkpoint_dir}'"
-        )
+        raise FileNotFoundError(f"No checkpoint weights found in '{checkpoint_dir}'")
 
     print_fn(f"Loading weights from: {weight_file}")
     if weight_file.suffix == ".safetensors":
@@ -157,9 +155,7 @@ def main() -> None:
             "ACCELERATE_MIXED_PRECISION",
         )
     ):
-        raise RuntimeError(
-            "Run with: accelerate launch scripts/eval_lm_harness.py ..."
-        )
+        raise RuntimeError("Run with: accelerate launch scripts/eval_lm_harness.py ...")
 
     # Heavy benchmark dependencies and distributed state are initialized only
     # for an actual evaluation, keeping helper functions CPU-testable.
@@ -179,14 +175,16 @@ def main() -> None:
 
     accelerator.print(f"Loading tokenizer ({config.tokenizer_name})...")
     tokenizer = AutoTokenizer.from_pretrained(config.tokenizer_name)
-    if tokenizer.vocab_size != config.vocab_size:
+    if tokenizer is None or tokenizer.vocab_size != config.vocab_size:
         raise RuntimeError(
-            f"Tokenizer vocabulary ({tokenizer.vocab_size}) does not match "
+            f"Tokenizer vocabulary ({getattr(tokenizer, 'vocab_size', None)}) does not match "
             f"model configuration ({config.vocab_size})"
         )
 
+    from typing import Any, cast
+
     evaluation_model = HFLM(
-        pretrained=model,
+        pretrained=cast(Any, model),
         tokenizer=tokenizer,
         batch_size=1,
         device=str(accelerator.device),

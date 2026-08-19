@@ -38,6 +38,7 @@ def test_resume_state_round_trip_preserves_exact_pending_tokens(tmp_path):
         UltronConfig(),
     )
 
+    assert restored_state is not None
     assert restored_state["source_documents_consumed"] == 0
     assert restored_pending.tolist() == pending
 
@@ -66,6 +67,7 @@ def test_committed_shard_size_is_validated(tmp_path):
         UltronConfig(),
     )
 
+    assert restored_state is not None
     assert restored_state["next_shard"] == 1
     assert restored_pending.tolist() == [21]
 

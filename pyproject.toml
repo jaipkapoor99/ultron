@@ -17,6 +17,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "pyrefly>=0.1.0",
     "pytest>=9.0.0",
     "pytest-cov>=7.1.0",
     "ruff>=0.16.3",
@@ -41,6 +42,10 @@ fail_under = 69
 target-version = "py314"
 line-length = 88
 
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
 [tool.ruff.lint]
 select = [
     "B",    # flake8-bugbear: likely bugs and design problems
@@ -54,3 +59,6 @@ select = [
     "SIM",  # flake8-simplify
     "UP",   # pyupgrade for the supported Python version
 ]
+
+[tool.pyrefly]
+python_version = "3.14"

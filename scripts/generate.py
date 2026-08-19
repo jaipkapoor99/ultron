@@ -132,9 +132,7 @@ def ban_repeated_ngrams(
                 token_ids[batch_index, start : start + prefix_length],
                 prefix,
             ):
-                banned_tokens.append(
-                    token_ids[batch_index, start + prefix_length]
-                )
+                banned_tokens.append(token_ids[batch_index, start + prefix_length])
         if banned_tokens:
             filtered[batch_index, torch.stack(banned_tokens)] = -torch.inf
     return filtered
@@ -295,9 +293,9 @@ def main() -> None:
     config, training_state = load_checkpoint_metadata(args.checkpoint)
     accelerator.print(f"Loading tokenizer ({config.tokenizer_name})...")
     tokenizer = AutoTokenizer.from_pretrained(config.tokenizer_name)
-    if tokenizer.vocab_size != config.vocab_size:
+    if tokenizer is None or tokenizer.vocab_size != config.vocab_size:
         raise RuntimeError(
-            f"Tokenizer vocabulary ({tokenizer.vocab_size}) does not match "
+            f"Tokenizer vocabulary ({getattr(tokenizer, 'vocab_size', None)}) does not match "
             f"checkpoint configuration ({config.vocab_size})"
         )
 
@@ -317,6 +315,7 @@ def main() -> None:
 
     generator = torch.Generator(device=accelerator.device)
     generator.manual_seed(args.seed)
+
     def selector(logits, tokens):
         return select_next_token(
             logits,
@@ -376,9 +375,7 @@ def main() -> None:
                 skip_special_tokens=True,
             )
             accelerator.print(f"\n{'=' * 70}")
-            accelerator.print(
-                f"Prompt {prompt_index}, sample {sample_index}"
-            )
+            accelerator.print(f"Prompt {prompt_index}, sample {sample_index}")
             accelerator.print(f"{prompt}{continuation}")
     accelerator.print("=" * 70)
 
