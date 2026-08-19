@@ -2,7 +2,7 @@
 
 This document explains the data tokenization, memory-mapping, distributed training loop, and checkpoint resume contracts for **Ultron-113M**.
 
----
+______________________________________________________________________
 
 ## 1. Pre-tokenization & Sharding (`scripts/tokenize_dataset.py`)
 
@@ -18,7 +18,7 @@ This document explains the data tokenization, memory-mapping, distributed traini
 python scripts/tokenize_dataset.py --shard-size-tokens 100000000 --max-shards 100
 ```
 
----
+______________________________________________________________________
 
 ## 2. Memory-Mapped Dataset & Sampling Geometry (`dataset.py`)
 
@@ -28,21 +28,21 @@ python scripts/tokenize_dataset.py --shard-size-tokens 100000000 --max-shards 10
 - **Leakage-Safe Train/Dev Split**: Multiple-shard datasets are partitioned strictly at shard boundaries (e.g., 19 shards for training, 1 shard for dev evaluation).
 - **Epoch Shuffling**: `EpochRandomSampler` applies seeded, deterministic permutations per epoch (`data_seed + epoch`), ensuring exact reproducibility upon checkpoint resumption.
 
----
+______________________________________________________________________
 
 ## 3. Pre-training Loop & Optimization (`trainer.py`, `train.py`)
 
 ### Training Hyperparameters
 
-| Hyperparameter               | Value             | Description                                                            |
-| :--------------------------- | :---------------- | :--------------------------------------------------------------------- |
-| **Global Batch Size**        | 65,536 tokens     | Micro-batch 16 $\times$ 4 gradient accumulation $\times$ 1,024 context |
-| **Total Optimization Steps** | 152,587           | Reaching ~10.0 Billion tokens                                          |
-| **Precision**                | BFloat16 (`bf16`) | Native mixed precision via PyTorch AMP / Accelerate                    |
-| **Muon Learning Rate**       | `0.04`            | For 2D weight matrices                                                 |
-| **AdamW Learning Rate**      | `1.2e-3`          | For 1D vectors and embedding tables                                    |
-| **Schedule**                 | WSD               | Warmup (200 steps) $\to$ Stable (80%) $\to$ Linear Decay (20%)         |
-| **Graph Compilation**        | `torch.compile`   | Inductor backend with `high` float32 matmul precision                  |
+| Hyperparameter               | Value             | Description                                                              |
+| :--------------------------- | :---------------- | :----------------------------------------------------------------------- |
+| **Global Batch Size**        | 65,536 tokens     | Micro-batch 16 $\\times$ 4 gradient accumulation $\\times$ 1,024 context |
+| **Total Optimization Steps** | 152,587           | Reaching ~10.0 Billion tokens                                            |
+| **Precision**                | BFloat16 (`bf16`) | Native mixed precision via PyTorch AMP / Accelerate                      |
+| **Muon Learning Rate**       | `0.04`            | For 2D weight matrices                                                   |
+| **AdamW Learning Rate**      | `1.2e-3`          | For 1D vectors and embedding tables                                      |
+| **Schedule**                 | WSD               | Warmup (200 steps) $\\to$ Stable (80%) $\\to$ Linear Decay (20%)         |
+| **Graph Compilation**        | `torch.compile`   | Inductor backend with `high` float32 matmul precision                    |
 
 ### Launch Commands
 
@@ -57,7 +57,7 @@ accelerate launch train.py --mode=continue
 accelerate launch train.py --mode=test
 ```
 
----
+______________________________________________________________________
 
 ## 4. Exact Resume Contract
 
@@ -66,8 +66,8 @@ Checkpoint recovery restores the complete multi-component training state:
 Checkpoint recovery restores the complete multi-component training state:
 
 1. Model weights ([`accelerate_checkpoint/model.safetensors`](../accelerate_checkpoint/))
-2. Optimizer states for both Muon and AdamW
-3. RNG seeds for PyTorch, NumPy, and Python
-4. Sampler shuffle epoch and batch offset derived from `step`
-5. Rotating validation cursor (`dev_batch_cursor`)
-6. W&B experiment tracking identity (`resume="allow"`)
+1. Optimizer states for both Muon and AdamW
+1. RNG seeds for PyTorch, NumPy, and Python
+1. Sampler shuffle epoch and batch offset derived from `step`
+1. Rotating validation cursor (`dev_batch_cursor`)
+1. W&B experiment tracking identity (`resume="allow"`)

@@ -17,23 +17,23 @@ A high-performance PyTorch implementation of **Ultron-113M**, pre-trained from s
 > - **Fine-Tuned Instruct Checkpoint**: [`jaipkapoor99/ultron-113m-instruct`](https://huggingface.co/jaipkapoor99/ultron-113m-instruct) (SmolTalk SFT instruction alignment).
 > - **Pre-tokenized Datasets**: [`jaipkapoor99/ultron-fineweb-edu-shards`](https://huggingface.co/datasets/jaipkapoor99/ultron-fineweb-edu-shards) & [`jaipkapoor99/ultron-smoltalk-shards`](https://huggingface.co/datasets/jaipkapoor99/ultron-smoltalk-shards).
 
----
+______________________________________________________________________
 
 ## ⚡ Specifications at a Glance
 
-| Property              | Specification                                                                   |
-| :-------------------- | :------------------------------------------------------------------------------ |
-| **Parameter Count**   | **113.3 Million** (tied embeddings)                                             |
-| **Architecture**      | 12 Layers, 768 Embedding Dimension, Pre-RMSNorm                                 |
-| **Attention**         | **Grouped-Query Attention (GQA)**: 12 Query Heads : 4 KV Heads (3:1 ratio)      |
-| **Position Encoding** | **RoPE (Rotary)**, base $\theta = 10,000$, 1,024 Context Length                 |
-| **Stability**         | **QK-Head RMSNorm** + **Logit Soft-Capping** (15.0 via tanh)                    |
-| **FeedForward**       | **SwiGLU** (Tensor Core aligned to multiples of 64)                             |
-| **Optimization**      | **PyTorch Muon** (2D body matrices) + **Fused AdamW** (1D vectors & embeddings) |
+| Property              | Specification                                                                           |
+| :-------------------- | :-------------------------------------------------------------------------------------- |
+| **Parameter Count**   | **113.3 Million** (tied embeddings)                                                     |
+| **Architecture**      | 12 Layers, 768 Embedding Dimension, Pre-RMSNorm                                         |
+| **Attention**         | **Grouped-Query Attention (GQA)**: 12 Query Heads : 4 KV Heads (3:1 ratio)              |
+| **Position Encoding** | **RoPE (Rotary)**, base $\\theta = 10,000$, 1,024 Context Length                        |
+| **Stability**         | **QK-Head RMSNorm** + **Logit Soft-Capping** (15.0 via tanh)                            |
+| **FeedForward**       | **SwiGLU** (Tensor Core aligned to multiples of 64)                                     |
+| **Optimization**      | **PyTorch Muon** (2D body matrices) + **Fused AdamW** (1D vectors & embeddings)         |
 | **Pre-training**      | 10 Billion tokens (FineWeb-Edu), 189k tok/s peak, Final Dev Loss: **2.965** (19.39 PPL) |
-| **Fine-Tuning (SFT)** | 164M tokens (SmolTalk), 192k tok/s peak, Final Dev Loss: **1.466** (4.33 PPL)  |
+| **Fine-Tuning (SFT)** | 164M tokens (SmolTalk), 192k tok/s peak, Final Dev Loss: **1.466** (4.33 PPL)           |
 
----
+______________________________________________________________________
 
 ## 🚀 Quickstart
 
@@ -76,27 +76,27 @@ accelerate launch train_sft.py --mode=fresh
 python scripts/chat.py --checkpoint-dir=accelerate_sft_checkpoint
 ```
 
----
+______________________________________________________________________
 
 ## 🧪 Benchmark Highlights
 
 Evaluated across **17,195 un-truncated zero-shot examples** using EleutherAI's `lm-evaluation-harness`:
 
-| Benchmark | Base Model (Norm) | **Instruct SFT (Norm)** | Baseline (Random) |
-| :--- | :---: | :---: | :---: |
-| **PIQA** | **63.66%** | **61.86%** | 50.00% |
-| **Winogrande** | 49.17% | **50.83%** | 50.00% |
-| **ARC-Easy** | **47.05%** | **45.29%** | 25.00% |
-| **HellaSwag** | **33.75%** | **32.83%** | 25.00% |
-| **OpenBookQA** | **32.20%** | **29.80%** | 25.00% |
-| **ARC-Challenge** | **26.54%** | **25.26%** | 25.00% |
-| **Macro Average** | **40.41%** | **38.58%** | 33.33% |
+| Benchmark         | Base Model (Norm) | **Instruct SFT (Norm)** | Baseline (Random) |
+| :---------------- | :---------------: | :---------------------: | :---------------: |
+| **PIQA**          |    **63.66%**     |       **61.86%**        |      50.00%       |
+| **Winogrande**    |      49.17%       |       **50.83%**        |      50.00%       |
+| **ARC-Easy**      |    **47.05%**     |       **45.29%**        |      25.00%       |
+| **HellaSwag**     |    **33.75%**     |       **32.83%**        |      25.00%       |
+| **OpenBookQA**    |    **32.20%**     |       **29.80%**        |      25.00%       |
+| **ARC-Challenge** |    **26.54%**     |       **25.26%**        |      25.00%       |
+| **Macro Average** |    **40.41%**     |       **38.58%**        |      33.33%       |
 
 > [!NOTE]
 > **A Note on 113M Parameter Scale & Realistic Expectations:**
 > While knowledge recall in a 113M parameter model may seem modest or prone to entity hallucinations compared to multi-billion parameter cloud models, this is the honest reality of the sub-200M parameter regime on a 10B token budget. Ultron-113M establishes clean linguistic syntax, solid commonsense reasoning, and disciplined ChatML turn-taking in a lightweight footprint that executes locally in milliseconds with under 250MB VRAM.
 
----
+______________________________________________________________________
 
 ## 📚 Documentation & Deep Dives
 
@@ -108,11 +108,11 @@ To keep this overview concise, detailed deep-dives are organized into dedicated 
 - 🗺️ **[Engineering Journey](JOURNEY.md)**: Lessons learned, bug investigations, and systems breakthroughs.
 - 📜 **[Contributor & Repository Guidelines](AGENTS.md)**: Development workflows, invariants, and coding standards.
 
----
+______________________________________________________________________
 
 ## 📜 Acknowledgments & Citation
 
-- Andrej Karpathy for [_Neural Networks: Zero to Hero_
+- Andrej Karpathy for \[_Neural Networks: Zero to Hero_
 - Andrej Karpathy for [_Neural Networks: Zero to Hero_](https://github.com/karpathy/build-nanogpt) and `nanoGPT`.
 - Keller Jordan et al. for pioneering the [Muon](https://github.com/KellerJordan/Muon) optimizer.
 

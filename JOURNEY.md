@@ -1,8 +1,9 @@
 # Engineering Journey
 
 🎵🎵🎸🎸
-> “Don't stop believin'  
-> Hold on to that feelin'  
+
+> “Don't stop believin'\
+> Hold on to that feelin'\
 > Streetlights, people”
 >
 > — Don't Stop Believing by Journey
@@ -223,11 +224,11 @@ parameter capacity constraints:
 
 1. **Conversational Mechanics:** The model flawlessly internalizes ChatML syntax,
    assistant greetings, multi-turn state, and turn termination (`<|im_end|>`).
-2. **The "Alignment Tax":** Standard zero-shot multiple-choice benchmarks
+1. **The "Alignment Tax":** Standard zero-shot multiple-choice benchmarks
    exhibit a slight distribution shift (Macro-average: 40.41% base vs 38.58%
    instruct), while semantic disambiguation tasks improved (Winogrande: 49.17%
    to 50.83%).
-3. **Parametric Capacity Bounds:** While outputs from a 113M model may seem
+1. **Parametric Capacity Bounds:** While outputs from a 113M model may seem
    insufficient or prone to entity hallucinations compared to multi-billion
    parameter cloud models, this is the honest reality of the sub-200M parameter
    regime on a 10B token budget. Ultron-113M establishes clean linguistic syntax,
@@ -273,20 +274,20 @@ parameter capacity constraints:
 ## Lessons Carried Forward
 
 1. Measure unique corpus coverage, not only nominal processed tokens.
-2. Treat stride, sampling, shuffling, and resume behavior as one system.
-3. Compare averaged training loss at matched steps before blaming validation.
-4. Validate all input artifacts before starting an expensive run.
-5. Make important state explicit, versioned, and testable.
-6. Prefer reproducible behavior over behavior that merely appears deterministic.
-7. Treat failed runs as evidence that improves the next design.
-8. Test corruption and resume boundaries, not only successful execution.
-9. Keep dependency declarations singular; generate environment-specific inputs
+1. Treat stride, sampling, shuffling, and resume behavior as one system.
+1. Compare averaged training loss at matched steps before blaming validation.
+1. Validate all input artifacts before starting an expensive run.
+1. Make important state explicit, versioned, and testable.
+1. Prefer reproducible behavior over behavior that merely appears deterministic.
+1. Treat failed runs as evidence that improves the next design.
+1. Test corruption and resume boundaries, not only successful execution.
+1. Keep dependency declarations singular; generate environment-specific inputs
    at the boundary that needs them.
-10. Run safe automated lint fixes before making narrow semantic corrections.
-11. In autoregressive SFT, always verify the $+1$ target index offset to avoid
-    trivial identity-copy leakage.
-12. Acknowledge model capacity scaling bounds: evaluate small models on formatting
-    and turn discipline rather than deep encyclopedic trivia recall.
+1. Run safe automated lint fixes before making narrow semantic corrections.
+1. In autoregressive SFT, always verify the $+1$ target index offset to avoid
+   trivial identity-copy leakage.
+1. Acknowledge model capacity scaling bounds: evaluate small models on formatting
+   and turn discipline rather than deep encyclopedic trivia recall.
 
 Ultron's engineering journey is not a story of avoiding mistakes. It is a story
 of converting each mistake into a stronger invariant, a clearer test, and a
